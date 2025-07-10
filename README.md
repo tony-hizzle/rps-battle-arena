@@ -1,14 +1,19 @@
 ## Introduction
 
-This is the initial README file for a new native AWS project (name TBD), as part of the "Disney Hack the Code Challenge", a mini hack-a-thon for building applications using Q CLI or IDE experience. The project, including the files below, will be implemented by the Amazon Q Developer, through interactive discussion with the user.
+This is the README file for **RPS Battle Arena**, a multiplayer Rock, Paper, Scissors web application built as part of the "Disney Hack the Code Challenge", a mini hack-a-thon for building applications using Amazon Q Developer IDE experience. The project, including the files below, will be implemented by the Amazon Q Developer, through interactive discussion with the user.
 
 ## Use case
 
-(This paragraph to be replaced with a description of the use case this project is setting out to solve, and how it will help customers/end users.)
+RPS Battle Arena provides an engaging multiplayer gaming experience where users can play the classic Rock, Paper, Scissors game against other online players in real-time. The application solves the problem of finding opponents for this simple yet entertaining game, while adding competitive elements through win tracking and leaderboards. This creates a fun, accessible gaming platform that brings people together for quick, casual gameplay sessions.
 
 ## Value proposition
 
-(This paragraph to be replaced with a description of the value proposition. Convince the reader why this application/solution is valuable to end users customers.)
+RPS Battle Arena delivers instant entertainment value through:
+- **Real-time multiplayer gameplay** - No waiting for turns, immediate game resolution
+- **Competitive tracking** - Personal statistics and leaderboards motivate continued play
+- **Zero setup required** - Browser-based gameplay with simple authentication
+- **Scalable architecture** - Built on AWS serverless technology for reliable performance
+- **Cost-effective solution** - Demonstrates how to build engaging multiplayer experiences using AWS native services efficiently
 
 ## Development approach
 
