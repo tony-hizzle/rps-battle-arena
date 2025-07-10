@@ -1,10 +1,10 @@
 class RPSGame {
     constructor() {
         this.user = null;
-        this.websocket = null;
         this.currentGame = null;
-        this.apiUrl = 'YOUR_API_GATEWAY_URL'; // Will be replaced with actual URL
-        this.wsUrl = 'YOUR_WEBSOCKET_URL'; // Will be replaced with actual URL
+        this.apiUrl = window.location.origin.includes('localhost') ? 
+            'https://YOUR_API_GATEWAY_URL' : // Will be replaced with actual URL
+            '/api'; // For local development
         
         this.initializeEventListeners();
         this.showScreen('login-screen');
@@ -66,52 +66,35 @@ class RPSGame {
 
     logout() {
         this.user = null;
-        this.disconnectWebSocket();
         document.getElementById('user-info').classList.add('hidden');
         document.getElementById('username-input').value = '';
         this.showScreen('login-screen');
     }
 
     showMainMenu() {
-        this.disconnectWebSocket();
         this.showScreen('main-menu');
     }
 
     async findGame() {
         this.showScreen('waiting-screen');
-        this.connectWebSocket();
+        
+        try {
+            // Simulate finding a game
+            setTimeout(() => {
+                this.onGameFound({
+                    gameId: 'game_' + Date.now(),
+                    opponent: 'Player_' + Math.floor(Math.random() * 1000)
+                });
+            }, 2000 + Math.random() * 1000);
+        } catch (error) {
+            console.error('Find game failed:', error);
+            alert('Failed to find game. Please try again.');
+            this.showMainMenu();
+        }
     }
 
     cancelSearch() {
-        this.disconnectWebSocket();
         this.showMainMenu();
-    }
-
-    connectWebSocket() {
-        if (this.websocket) {
-            this.websocket.close();
-        }
-
-        // For demo purposes, simulate WebSocket connection
-        // In production, use actual WebSocket URL
-        this.simulateWebSocketConnection();
-    }
-
-    simulateWebSocketConnection() {
-        // Simulate finding a game after 2-3 seconds
-        setTimeout(() => {
-            this.onGameFound({
-                gameId: 'game_' + Date.now(),
-                opponent: 'Player_' + Math.floor(Math.random() * 1000)
-            });
-        }, 2000 + Math.random() * 1000);
-    }
-
-    disconnectWebSocket() {
-        if (this.websocket) {
-            this.websocket.close();
-            this.websocket = null;
-        }
     }
 
     onGameFound(data) {
@@ -120,20 +103,37 @@ class RPSGame {
         this.showScreen('game-screen');
     }
 
-    makeMove(move) {
+    async makeMove(move) {
         if (!this.currentGame) return;
 
-        // Simulate opponent move and game result
-        const moves = ['rock', 'paper', 'scissors'];
-        const opponentMove = moves[Math.floor(Math.random() * 3)];
-        
-        const result = this.determineWinner(move, opponentMove);
-        
-        this.showResult({
-            yourMove: move,
-            opponentMove: opponentMove,
-            result: result
-        });
+        try {
+            const response = await fetch(`${this.apiUrl}/game`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'play',
+                    userId: this.user?.userId,
+                    move: move
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showResult({
+                    yourMove: data.data.yourMove,
+                    opponentMove: data.data.opponentMove,
+                    result: data.data.result
+                });
+            } else {
+                throw new Error(data.error);
+            }
+        } catch (error) {
+            console.error('Make move failed:', error);
+            alert('Failed to make move. Please try again.');
+        }
     }
 
     determineWinner(playerMove, opponentMove) {
@@ -179,47 +179,94 @@ class RPSGame {
     }
 
     async showStats() {
-        // Simulate stats data
-        const stats = {
+        try {
+            let stats;
+            if (this.user?.userId && !this.user.userId.startsWith('user_')) {
+                // Try to fetch real stats
+                const response = await fetch(`${this.apiUrl}/stats/${this.user.userId}`);
+                const data = await response.json();
+                stats = data.success ? data.data : this.getDefaultStats();
+            } else {
+                stats = this.getDefaultStats();
+            }
+
+            document.getElementById('total-games').textContent = stats.totalGames;
+            document.getElementById('wins').textContent = stats.wins;
+            document.getElementById('losses').textContent = stats.losses;
+            document.getElementById('draws').textContent = stats.draws;
+
+            this.showScreen('stats-screen');
+        } catch (error) {
+            console.error('Failed to load stats:', error);
+            const stats = this.getDefaultStats();
+            document.getElementById('total-games').textContent = stats.totalGames;
+            document.getElementById('wins').textContent = stats.wins;
+            document.getElementById('losses').textContent = stats.losses;
+            document.getElementById('draws').textContent = stats.draws;
+            this.showScreen('stats-screen');
+        }
+    }
+
+    getDefaultStats() {
+        return {
             totalGames: Math.floor(Math.random() * 50),
             wins: Math.floor(Math.random() * 30),
             losses: Math.floor(Math.random() * 15),
             draws: Math.floor(Math.random() * 5)
         };
-
-        document.getElementById('total-games').textContent = stats.totalGames;
-        document.getElementById('wins').textContent = stats.wins;
-        document.getElementById('losses').textContent = stats.losses;
-        document.getElementById('draws').textContent = stats.draws;
-
-        this.showScreen('stats-screen');
     }
 
     async showLeaderboard() {
-        // Simulate leaderboard data
-        const leaderboard = [
+        try {
+            const response = await fetch(`${this.apiUrl}/leaderboard`);
+            const data = await response.json();
+            const leaderboard = data.success ? data.data : this.getDefaultLeaderboard();
+
+            const leaderboardList = document.getElementById('leaderboard-list');
+            leaderboardList.innerHTML = '';
+
+            leaderboard.forEach((player, index) => {
+                const item = document.createElement('div');
+                item.className = 'leaderboard-item';
+                item.innerHTML = `
+                    <span class="leaderboard-rank">#${index + 1}</span>
+                    <span>${player.username}</span>
+                    <span>${player.wins} wins</span>
+                `;
+                leaderboardList.appendChild(item);
+            });
+
+            this.showScreen('leaderboard-screen');
+        } catch (error) {
+            console.error('Failed to load leaderboard:', error);
+            // Show default leaderboard on error
+            const leaderboard = this.getDefaultLeaderboard();
+            const leaderboardList = document.getElementById('leaderboard-list');
+            leaderboardList.innerHTML = '';
+
+            leaderboard.forEach((player, index) => {
+                const item = document.createElement('div');
+                item.className = 'leaderboard-item';
+                item.innerHTML = `
+                    <span class="leaderboard-rank">#${index + 1}</span>
+                    <span>${player.username}</span>
+                    <span>${player.wins} wins</span>
+                `;
+                leaderboardList.appendChild(item);
+            });
+
+            this.showScreen('leaderboard-screen');
+        }
+    }
+
+    getDefaultLeaderboard() {
+        return [
             { username: 'RockMaster', wins: 45 },
             { username: 'PaperChamp', wins: 38 },
             { username: 'ScissorsPro', wins: 32 },
             { username: 'GameWinner', wins: 28 },
             { username: 'RPSKing', wins: 25 }
         ];
-
-        const leaderboardList = document.getElementById('leaderboard-list');
-        leaderboardList.innerHTML = '';
-
-        leaderboard.forEach((player, index) => {
-            const item = document.createElement('div');
-            item.className = 'leaderboard-item';
-            item.innerHTML = `
-                <span class="leaderboard-rank">#${index + 1}</span>
-                <span>${player.username}</span>
-                <span>${player.wins} wins</span>
-            `;
-            leaderboardList.appendChild(item);
-        });
-
-        this.showScreen('leaderboard-screen');
     }
 }
 
