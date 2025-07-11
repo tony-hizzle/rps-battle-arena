@@ -6,6 +6,7 @@ const dynamodb = new AWS.DynamoDB.DocumentClient();
 const USERS_TABLE = process.env.USERS_TABLE;
 const GAMES_TABLE = process.env.GAMES_TABLE;
 const CONNECTIONS_TABLE = process.env.CONNECTIONS_TABLE;
+const PHONE_VERIFICATION_TABLE = process.env.PHONE_VERIFICATION_TABLE;
 
 // User operations
 const createUser = async (userData) => {
@@ -27,13 +28,25 @@ const createUser = async (userData) => {
     return user;
 };
 
-const getUser = async (userId) => {
-    const result = await dynamodb.get({
+const getUser = async (identifier) => {
+    // Try to get user by userId first
+    let result = await dynamodb.get({
         TableName: USERS_TABLE,
-        Key: { userId }
+        Key: { userId: identifier }
     }).promise();
     
-    return result.Item;
+    if (result.Item) {
+        return result.Item;
+    }
+    
+    // If not found, try to find by phone number
+    const scanResult = await dynamodb.scan({
+        TableName: USERS_TABLE,
+        FilterExpression: 'phoneNumber = :phoneNumber',
+        ExpressionAttributeValues: { ':phoneNumber': identifier }
+    }).promise();
+    
+    return scanResult.Items && scanResult.Items.length > 0 ? scanResult.Items[0] : null;
 };
 
 const updateUserStats = async (userId, result) => {
@@ -121,6 +134,34 @@ const getWaitingPlayers = async () => {
     return result.Items;
 };
 
+// Phone verification operations
+const saveVerificationCode = async (phoneNumber, code) => {
+    await dynamodb.put({
+        TableName: PHONE_VERIFICATION_TABLE,
+        Item: {
+            phoneNumber,
+            code,
+            expiresAt: Math.floor(Date.now() / 1000) + 600 // 10 minutes TTL
+        }
+    }).promise();
+};
+
+const getVerificationCode = async (phoneNumber) => {
+    const result = await dynamodb.get({
+        TableName: PHONE_VERIFICATION_TABLE,
+        Key: { phoneNumber }
+    }).promise();
+    
+    return result.Item ? result.Item.code : null;
+};
+
+const deleteVerificationCode = async (phoneNumber) => {
+    await dynamodb.delete({
+        TableName: PHONE_VERIFICATION_TABLE,
+        Key: { phoneNumber }
+    }).promise();
+};
+
 module.exports = {
     createUser,
     getUser,
@@ -129,5 +170,8 @@ module.exports = {
     updateGame,
     saveConnection,
     removeConnection,
-    getWaitingPlayers
+    getWaitingPlayers,
+    saveVerificationCode,
+    getVerificationCode,
+    deleteVerificationCode
 };
