@@ -254,6 +254,25 @@
         let gameStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
         let gameMode = 'computer';
         let searchTimeout = null;
+        
+        // Check for saved login on page load
+        window.addEventListener('load', function() {
+            const savedUser = localStorage.getItem('rpsUser');
+            if (savedUser) {
+                try {
+                    currentUser = JSON.parse(savedUser);
+                    document.getElementById('player-name').textContent = currentUser.username;
+                    document.getElementById('player-name-mode').textContent = currentUser.username;
+                    showScreen('mode-screen');
+                    loadUserStats();
+                } catch (error) {
+                    localStorage.removeItem('rpsUser');
+                    showScreen('login-screen');
+                }
+            } else {
+                showScreen('login-screen');
+            }
+        });
 
         function showScreen(screenId) {
             document.querySelectorAll('[id$="-screen"]').forEach(screen => {
@@ -292,6 +311,7 @@
                 
                 if (data.success) {
                     currentUser = data.data.user;
+                    localStorage.setItem('rpsUser', JSON.stringify(currentUser));
                     document.getElementById('player-name').textContent = username;
                     document.getElementById('player-name-mode').textContent = username;
                     showScreen('mode-screen');
@@ -323,6 +343,7 @@
                 
                 if (data.success) {
                     currentUser = data.data.user;
+                    localStorage.setItem('rpsUser', JSON.stringify(currentUser));
                     document.getElementById('player-name').textContent = username;
                     document.getElementById('player-name-mode').textContent = username;
                     showScreen('mode-screen');
@@ -333,6 +354,7 @@
             } catch (error) {
                 // Fallback for offline mode
                 currentUser = { userId: 'offline_' + Date.now(), username };
+                localStorage.setItem('rpsUser', JSON.stringify(currentUser));
                 document.getElementById('player-name').textContent = username;
                 document.getElementById('player-name-mode').textContent = username;
                 showScreen('mode-screen');
@@ -616,6 +638,9 @@
             currentUser = null;
             gameStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
             gameMode = 'computer';
+            
+            // Clear localStorage
+            localStorage.removeItem('rpsUser');
             
             // Cancel any ongoing search
             if (searchTimeout) {
