@@ -157,7 +157,7 @@
                 <div id="login-form">
                     <input type="tel" id="login-phone" placeholder="Enter phone number (+1234567890)" required>
                     <button class="primary-btn" onclick="loginUser()">Send Login Code</button>
-                    <button onclick="showRegister()">New User? Register</button>
+                    <button onclick="showRegister()">Register</button>
                 </div>
                 <div id="login-verify-form" class="hidden">
                     <h3>Enter Login Code</h3>
@@ -300,6 +300,10 @@
         }
 
         function showRegister() {
+            const loginPhone = document.getElementById('login-phone').value.trim();
+            if (loginPhone) {
+                document.getElementById('reg-phone').value = loginPhone;
+            }
             document.getElementById('login-form').classList.add('hidden');
             document.getElementById('register-form').classList.remove('hidden');
         }
@@ -418,7 +422,11 @@
                     document.getElementById('login-form').classList.add('hidden');
                     document.getElementById('login-verify-form').classList.remove('hidden');
                 } else {
-                    alert('Login failed: ' + data.error);
+                    if (data.error && data.error.includes('not found')) {
+                        showRegister();
+                    } else {
+                        alert('Login failed: ' + data.error);
+                    }
                 }
             } catch (error) {
                 alert('Login failed. Please try again.');
