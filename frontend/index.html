@@ -155,13 +155,13 @@
             <div id="login-screen">
                 <h2>Join the Battle!</h2>
                 <div id="login-form">
-                    <input type="tel" id="login-phone" placeholder="Enter phone number (+1234567890)" required>
+                    <input type="email" id="login-email" placeholder="Enter email address" required>
                     <button class="primary-btn" onclick="loginUser()">Send Login Code</button>
                     <button onclick="showRegister()">Register</button>
                 </div>
                 <div id="login-verify-form" class="hidden">
                     <h3>Enter Login Code</h3>
-                    <p>Code sent to: <span id="login-verify-phone"></span></p>
+                    <p>Code sent to: <span id="login-verify-email"></span></p>
                     <input type="text" id="login-verify-code" placeholder="Enter 6-digit code" maxlength="6" required>
                     <button class="primary-btn" onclick="verifyLogin()">Login</button>
                     <button onclick="resendLoginCode()">Resend Code</button>
@@ -169,15 +169,15 @@
                 </div>
                 <div id="register-form" class="hidden">
                     <input type="text" id="reg-username" placeholder="Choose username" required>
-                    <input type="tel" id="reg-phone" placeholder="Enter phone number (+1234567890)" required>
+                    <input type="email" id="reg-email" placeholder="Enter email address" required>
                     <button class="primary-btn" onclick="registerUser()">Send Code</button>
                     <button onclick="showLogin()">Back to Login</button>
                 </div>
                 <div id="verify-form" class="hidden">
                     <h3>Enter Verification Code</h3>
-                    <p>Code sent to: <span id="verify-phone"></span></p>
+                    <p>Code sent to: <span id="verify-email"></span></p>
                     <input type="text" id="verify-code" placeholder="Enter 6-digit code" maxlength="6" required>
-                    <button class="primary-btn" onclick="verifyPhone()">Verify</button>
+                    <button class="primary-btn" onclick="verifyEmail()">Verify</button>
                     <button onclick="resendCode()">Resend Code</button>
                     <button onclick="showLogin()">Back to Login</button>
                 </div>
@@ -300,9 +300,9 @@
         }
 
         function showRegister() {
-            const loginPhone = document.getElementById('login-phone').value.trim();
-            if (loginPhone) {
-                document.getElementById('reg-phone').value = loginPhone;
+            const loginEmail = document.getElementById('login-email').value.trim();
+            if (loginEmail) {
+                document.getElementById('reg-email').value = loginEmail;
             }
             document.getElementById('login-form').classList.add('hidden');
             document.getElementById('register-form').classList.remove('hidden');
@@ -317,9 +317,9 @@
         
         async function registerUser() {
             const username = document.getElementById('reg-username').value.trim();
-            const phoneNumber = document.getElementById('reg-phone').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
             
-            if (!username || !phoneNumber) {
+            if (!username || !email) {
                 alert('Please fill in all fields');
                 return;
             }
@@ -328,13 +328,13 @@
                 const response = await fetch(`${API_URL}/auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'register', username, phoneNumber })
+                    body: JSON.stringify({ action: 'register', username, email })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    document.getElementById('verify-phone').textContent = phoneNumber;
+                    document.getElementById('verify-email').textContent = email;
                     document.getElementById('register-form').classList.add('hidden');
                     document.getElementById('verify-form').classList.remove('hidden');
                 } else {
@@ -345,8 +345,8 @@
             }
         }
         
-        async function verifyPhone() {
-            const phoneNumber = document.getElementById('verify-phone').textContent;
+        async function verifyEmail() {
+            const email = document.getElementById('verify-email').textContent;
             const verificationCode = document.getElementById('verify-code').value.trim();
             
             if (!verificationCode) {
@@ -358,7 +358,7 @@
                 const response = await fetch(`${API_URL}/auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'verify_phone', phoneNumber, verificationCode })
+                    body: JSON.stringify({ action: 'verify_email', email, verificationCode })
                 });
                 
                 const data = await response.json();
@@ -379,13 +379,13 @@
         }
         
         async function resendCode() {
-            const phoneNumber = document.getElementById('verify-phone').textContent;
+            const email = document.getElementById('verify-email').textContent;
             
             try {
                 const response = await fetch(`${API_URL}/auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'resend_code', phoneNumber })
+                    body: JSON.stringify({ action: 'resend_code', email })
                 });
                 
                 const data = await response.json();
@@ -401,10 +401,10 @@
         }
         
         async function loginUser() {
-            const phoneNumber = document.getElementById('login-phone').value.trim();
+            const email = document.getElementById('login-email').value.trim();
             
-            if (!phoneNumber) {
-                alert('Please enter a phone number');
+            if (!email) {
+                alert('Please enter an email address');
                 return;
             }
             
@@ -412,18 +412,18 @@
                 const response = await fetch(`${API_URL}/auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'login', phoneNumber })
+                    body: JSON.stringify({ action: 'login', email })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    document.getElementById('login-verify-phone').textContent = phoneNumber;
+                    document.getElementById('login-verify-email').textContent = email;
                     document.getElementById('login-form').classList.add('hidden');
                     document.getElementById('login-verify-form').classList.remove('hidden');
                 } else {
                     if (data.error && data.error.includes('not found')) {
-                        alert('Phone number not found. Redirecting to registration.');
+                        alert('Email not found. Redirecting to registration.');
                         showRegister();
                     } else {
                         alert('Login failed: ' + data.error);
@@ -435,7 +435,7 @@
         }
         
         async function verifyLogin() {
-            const phoneNumber = document.getElementById('login-verify-phone').textContent;
+            const email = document.getElementById('login-verify-email').textContent;
             const verificationCode = document.getElementById('login-verify-code').value.trim();
             
             if (!verificationCode) {
@@ -447,7 +447,7 @@
                 const response = await fetch(`${API_URL}/auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'verify_login', phoneNumber, verificationCode })
+                    body: JSON.stringify({ action: 'verify_login', email, verificationCode })
                 });
                 
                 const data = await response.json();
@@ -468,13 +468,13 @@
         }
         
         async function resendLoginCode() {
-            const phoneNumber = document.getElementById('login-verify-phone').textContent;
+            const email = document.getElementById('login-verify-email').textContent;
             
             try {
                 const response = await fetch(`${API_URL}/auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'login', phoneNumber })
+                    body: JSON.stringify({ action: 'login', email })
                 });
                 
                 const data = await response.json();
@@ -896,10 +896,10 @@
             }
             
             // Clear form fields
-            document.getElementById('login-phone').value = '';
+            document.getElementById('login-email').value = '';
             document.getElementById('login-verify-code').value = '';
             document.getElementById('reg-username').value = '';
-            document.getElementById('reg-phone').value = '';
+            document.getElementById('reg-email').value = '';
             document.getElementById('verify-code').value = '';
             
             // Show login screen
