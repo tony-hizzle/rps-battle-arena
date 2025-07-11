@@ -637,19 +637,24 @@ exports.handler = async (event) => {
                 
                 const result = await dynamodb.scan({
                     TableName: process.env.GAMES_TABLE,
-                    FilterExpression: 'player1Id = :userId',
-                    ExpressionAttributeValues: { ':userId': userId },
-                    Limit: 10
+                    FilterExpression: 'player1Id = :userId OR player2Id = :userId',
+                    ExpressionAttributeValues: { ':userId': userId }
                 }).promise();
                 
-                const games = result.Items.map(game => ({
-                    gameId: game.gameId,
-                    opponent: game.player2Id,
-                    yourMove: game.player1Move,
-                    opponentMove: game.player2Move,
-                    result: game.winner === userId ? 'win' : game.winner === 'draw' ? 'draw' : 'lose',
-                    date: game.createdAt
-                }));
+                const games = result.Items
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                    .slice(0, 10)
+                    .map(game => {
+                        const isPlayer1 = game.player1Id === userId;
+                        return {
+                            gameId: game.gameId,
+                            opponent: isPlayer1 ? game.player2Name || game.player2Id : game.player1Name || game.player1Id,
+                            yourMove: isPlayer1 ? game.player1Move : game.player2Move,
+                            opponentMove: isPlayer1 ? game.player2Move : game.player1Move,
+                            result: game.winner === userId ? 'win' : game.winner === 'draw' ? 'draw' : 'lose',
+                            date: game.createdAt
+                        };
+                    });
                 
                 return success(games);
             } catch (err) {
