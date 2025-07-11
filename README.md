@@ -27,8 +27,10 @@ Once all planning steps are completed and documented, and the user is ready to p
 
 ## 🚀 Live Application
 
-**Frontend URL**: http://rps-battle-arena-frontend-1752192633.s3-website-us-east-1.amazonaws.com
+**Standalone Game**: Open `rps-battle-arena.html` in your browser
 **API URL**: https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod/
+
+> Note: S3 frontend has permission issues. Use the standalone HTML file for immediate access.
 
 ### API Endpoints
 - `POST /auth` - User authentication

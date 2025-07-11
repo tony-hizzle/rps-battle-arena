@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPS Battle Arena</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            text-align: center;
+        }
+
+        header h1 {
+            color: white;
+            font-size: 2rem;
+        }
+
+        main {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 80px);
+            padding: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .card h2 {
+            margin-bottom: 1.5rem;
+            color: #333;
+            font-size: 1.8rem;
+        }
+
+        input {
+            padding: 1rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 0.5rem;
+            transition: all 0.3s;
+        }
+
+        .primary-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: bold;
+        }
+
+        .primary-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .move-btn {
+            background: white;
+            border: 3px solid #667eea;
+            color: #667eea;
+            font-size: 1.2rem;
+            padding: 1.5rem;
+            border-radius: 15px;
+            min-width: 120px;
+        }
+
+        .move-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .result {
+            margin: 1rem 0;
+            font-size: 1.1rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .stat {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🎮 RPS Battle Arena</h1>
+    </header>
+
+    <main>
+        <div class="card">
+            <div id="login-screen">
+                <h2>Join the Battle!</h2>
+                <input type="text" id="username" placeholder="Enter username" required>
+                <button class="primary-btn" onclick="startGame()">Start Playing</button>
+            </div>
+
+            <div id="game-screen" class="hidden">
+                <h2>Make Your Move!</h2>
+                <p>Playing as: <span id="player-name"></span></p>
+                <div>
+                    <button class="move-btn" onclick="makeMove('rock')">🪨 Rock</button>
+                    <button class="move-btn" onclick="makeMove('paper')">📄 Paper</button>
+                    <button class="move-btn" onclick="makeMove('scissors')">✂️ Scissors</button>
+                </div>
+            </div>
+
+            <div id="result-screen" class="hidden">
+                <h2 id="result-title"></h2>
+                <div class="result">
+                    <p>You played: <span id="your-move"></span></p>
+                    <p>Opponent played: <span id="opponent-move"></span></p>
+                </div>
+                <button class="primary-btn" onclick="playAgain()">Play Again</button>
+                <button onclick="showStats()">View Stats</button>
+            </div>
+
+            <div id="stats-screen" class="hidden">
+                <h2>Your Statistics</h2>
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-value" id="total-games">0</span>
+                        <span>Total Games</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="wins">0</span>
+                        <span>Wins</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="losses">0</span>
+                        <span>Losses</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="draws">0</span>
+                        <span>Draws</span>
+                    </div>
+                </div>
+                <button onclick="backToGame()">Back to Game</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = 'https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod';
+        let currentUser = null;
+        let gameStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
+
+        function showScreen(screenId) {
+            document.querySelectorAll('[id$="-screen"]').forEach(screen => {
+                screen.classList.add('hidden');
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function startGame() {
+            const username = document.getElementById('username').value.trim();
+            if (!username) {
+                alert('Please enter a username');
+                return;
+            }
+            
+            currentUser = username;
+            document.getElementById('player-name').textContent = username;
+            showScreen('game-screen');
+        }
+
+        async function makeMove(move) {
+            try {
+                const response = await fetch(`${API_URL}/game`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'play',
+                        move: move,
+                        userId: currentUser
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult(data.data);
+                } else {
+                    alert('Game error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('API Error:', error);
+                // Fallback to local simulation
+                simulateGame(move);
+            }
+        }
+
+        function simulateGame(playerMove) {
+            const moves = ['rock', 'paper', 'scissors'];
+            const opponentMove = moves[Math.floor(Math.random() * 3)];
+            const result = determineWinner(playerMove, opponentMove);
+            
+            showResult({
+                yourMove: playerMove,
+                opponentMove: opponentMove,
+                result: result,
+                opponent: 'Computer'
+            });
+        }
+
+        function determineWinner(move1, move2) {
+            if (move1 === move2) return 'draw';
+            
+            const winConditions = {
+                rock: 'scissors',
+                paper: 'rock',
+                scissors: 'paper'
+            };
+            
+            return winConditions[move1] === move2 ? 'win' : 'lose';
+        }
+
+        function showResult(gameResult) {
+            const { yourMove, opponentMove, result } = gameResult;
+            
+            document.getElementById('your-move').textContent = getMoveEmoji(yourMove);
+            document.getElementById('opponent-move').textContent = getMoveEmoji(opponentMove);
+            
+            const resultTitle = document.getElementById('result-title');
+            if (result === 'win') {
+                resultTitle.textContent = '🎉 You Win!';
+                resultTitle.style.color = '#28a745';
+                gameStats.wins++;
+            } else if (result === 'lose') {
+                resultTitle.textContent = '😔 You Lose!';
+                resultTitle.style.color = '#dc3545';
+                gameStats.losses++;
+            } else {
+                resultTitle.textContent = '🤝 It\'s a Draw!';
+                resultTitle.style.color = '#ffc107';
+                gameStats.draws++;
+            }
+            
+            gameStats.totalGames++;
+            showScreen('result-screen');
+        }
+
+        function getMoveEmoji(move) {
+            const emojis = {
+                rock: '🪨 Rock',
+                paper: '📄 Paper',
+                scissors: '✂️ Scissors'
+            };
+            return emojis[move] || move;
+        }
+
+        function playAgain() {
+            showScreen('game-screen');
+        }
+
+        function showStats() {
+            document.getElementById('total-games').textContent = gameStats.totalGames;
+            document.getElementById('wins').textContent = gameStats.wins;
+            document.getElementById('losses').textContent = gameStats.losses;
+            document.getElementById('draws').textContent = gameStats.draws;
+            showScreen('stats-screen');
+        }
+
+        function backToGame() {
+            showScreen('game-screen');
+        }
+    </script>
+</body>
+</html>
