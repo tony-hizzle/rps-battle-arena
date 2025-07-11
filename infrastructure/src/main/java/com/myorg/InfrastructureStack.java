@@ -55,7 +55,7 @@ public class InfrastructureStack extends Stack {
                 .environment(Map.of(
                         "USERS_TABLE", usersTable.getTableName(),
                         "GAMES_TABLE", gamesTable.getTableName(),
-                        "PHONE_VERIFICATION_TABLE", "rps-phone-verification"
+                        "EMAIL_VERIFICATION_TABLE", "rps-email-verification"
                 ))
                 .timeout(Duration.seconds(30))
                 .build();
@@ -100,11 +100,11 @@ public class InfrastructureStack extends Stack {
         Resource userGamesResource = gamesResource.addResource("{userId}");
         userGamesResource.addMethod("GET", new LambdaIntegration(gameFunction));
         
-        // Phone Verification Table
-        Table phoneVerificationTable = Table.Builder.create(this, "RpsPhoneVerificationTable")
-                .tableName("rps-phone-verification")
+        // Email Verification Table
+        Table emailVerificationTable = Table.Builder.create(this, "RpsEmailVerificationTable")
+                .tableName("rps-email-verification")
                 .partitionKey(Attribute.builder()
-                        .name("phoneNumber")
+                        .name("email")
                         .type(AttributeType.STRING)
                         .build())
                 .billingMode(BillingMode.PAY_PER_REQUEST)
@@ -112,8 +112,8 @@ public class InfrastructureStack extends Stack {
                 .timeToLiveAttribute("expiresAt")
                 .build();
                 
-        // Grant permissions to phone verification table
-        phoneVerificationTable.grantReadWriteData(gameFunction);
+        // Grant permissions to email verification table
+        emailVerificationTable.grantReadWriteData(gameFunction);
 
         // S3 Bucket removed for simplified deployment
 

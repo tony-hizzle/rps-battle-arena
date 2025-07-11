@@ -48,7 +48,7 @@ exports.handler = async (event) => {
                 
                 // Store verification data
                 await dynamodb.put({
-                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
                     Item: {
                         email: email,
                         verificationCode: code,
@@ -79,7 +79,7 @@ exports.handler = async (event) => {
                 
                 // Get verification record
                 const verification = await dynamodb.get({
-                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
                     Key: { email: email }
                 }).promise();
                 
@@ -110,7 +110,7 @@ exports.handler = async (event) => {
                 
                 // Mark as verified
                 await dynamodb.update({
-                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
                     Key: { email: email },
                     UpdateExpression: 'SET verified = :verified',
                     ExpressionAttributeValues: { ':verified': true }
@@ -132,7 +132,7 @@ exports.handler = async (event) => {
                 
                 // Get existing verification record
                 const verification = await dynamodb.get({
-                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
                     Key: { email: email }
                 }).promise();
                 
@@ -150,7 +150,7 @@ exports.handler = async (event) => {
                 
                 // Update verification record
                 await dynamodb.update({
-                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
                     Key: { email: email },
                     UpdateExpression: 'SET verificationCode = :code, expiresAt = :expires',
                     ExpressionAttributeValues: {
@@ -192,7 +192,7 @@ exports.handler = async (event) => {
                 
                 // Store login verification data
                 await dynamodb.put({
-                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
                     Item: {
                         email: email,
                         verificationCode: code,
@@ -224,7 +224,7 @@ exports.handler = async (event) => {
                 
                 // Get verification record
                 const verification = await dynamodb.get({
-                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
                     Key: { email: email }
                 }).promise();
                 
@@ -254,7 +254,7 @@ exports.handler = async (event) => {
                 
                 // Clean up verification record
                 await dynamodb.delete({
-                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
                     Key: { email: email }
                 }).promise();
                 
