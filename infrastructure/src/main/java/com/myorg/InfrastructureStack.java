@@ -85,23 +85,7 @@ public class InfrastructureStack extends Stack {
         Resource gameResource = api.getRoot().addResource("game");
         gameResource.addMethod("POST", new LambdaIntegration(gameFunction));
 
-        // S3 Bucket for frontend
-        Bucket websiteBucket = Bucket.Builder.create(this, "RpsWebsiteBucket")
-                .websiteIndexDocument("index.html")
-                .websiteErrorDocument("error.html")
-                .publicReadAccess(true)
-                .removalPolicy(software.amazon.awscdk.RemovalPolicy.DESTROY)
-                .autoDeleteObjects(true)
-                .build();
-
-        // CloudFront Distribution
-        Distribution distribution = Distribution.Builder.create(this, "RpsDistribution")
-                .defaultBehavior(BehaviorOptions.builder()
-                        .origin(new S3Origin(websiteBucket))
-                        .viewerProtocolPolicy(ViewerProtocolPolicy.REDIRECT_TO_HTTPS)
-                        .build())
-                .defaultRootObject("index.html")
-                .build();
+        // S3 Bucket removed for simplified deployment
 
         // Outputs
         CfnOutput.Builder.create(this, "RestApiUrl")
@@ -109,14 +93,6 @@ public class InfrastructureStack extends Stack {
                 .description("REST API URL")
                 .build();
 
-        CfnOutput.Builder.create(this, "WebsiteUrl")
-                .value("https://" + distribution.getDistributionDomainName())
-                .description("Website URL")
-                .build();
-
-        CfnOutput.Builder.create(this, "S3BucketName")
-                .value(websiteBucket.getBucketName())
-                .description("S3 Bucket Name for Frontend")
-                .build();
+        // Website URL output removed for simplified deployment
     }
 }

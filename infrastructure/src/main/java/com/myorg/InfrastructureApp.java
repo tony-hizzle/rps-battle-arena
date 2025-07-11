@@ -10,7 +10,7 @@ public class InfrastructureApp {
     public static void main(final String[] args) {
         App app = new App();
 
-        new InfrastructureStack(app, "InfrastructureStack", StackProps.builder()
+        new InfrastructureStack(app, "RpsBattleArenaStack", StackProps.builder()
                 // If you don't specify 'env', this stack will be environment-agnostic.
                 // Account/Region-dependent features and context lookups will not work,
                 // but a single synthesized template can be deployed anywhere.
