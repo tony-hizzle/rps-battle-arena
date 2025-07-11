@@ -6,14 +6,14 @@ const dynamodb = new AWS.DynamoDB.DocumentClient();
 const USERS_TABLE = process.env.USERS_TABLE;
 const GAMES_TABLE = process.env.GAMES_TABLE;
 const CONNECTIONS_TABLE = process.env.CONNECTIONS_TABLE;
-const PHONE_VERIFICATION_TABLE = process.env.PHONE_VERIFICATION_TABLE;
+const EMAIL_VERIFICATION_TABLE = process.env.EMAIL_VERIFICATION_TABLE;
 
 // User operations
 const createUser = async (userData) => {
     const user = {
         userId: userData.userId || uuidv4(),
         username: userData.username,
-        phoneNumber: userData.phoneNumber,
+        email: userData.email,
         createdAt: new Date().toISOString(),
         totalGames: 0,
         wins: 0,
@@ -40,11 +40,11 @@ const getUser = async (identifier) => {
         return result.Item;
     }
     
-    // If not found, try to find by phone number
+    // If not found, try to find by email
     const scanResult = await dynamodb.scan({
         TableName: USERS_TABLE,
-        FilterExpression: 'phoneNumber = :phoneNumber',
-        ExpressionAttributeValues: { ':phoneNumber': identifier }
+        FilterExpression: 'email = :email',
+        ExpressionAttributeValues: { ':email': identifier }
     }).promise();
     
     return scanResult.Items && scanResult.Items.length > 0 ? scanResult.Items[0] : null;
@@ -135,31 +135,31 @@ const getWaitingPlayers = async () => {
     return result.Items;
 };
 
-// Phone verification operations
-const saveVerificationCode = async (phoneNumber, code) => {
+// Email verification operations
+const saveVerificationCode = async (email, code) => {
     await dynamodb.put({
-        TableName: PHONE_VERIFICATION_TABLE,
+        TableName: EMAIL_VERIFICATION_TABLE,
         Item: {
-            phoneNumber,
+            email,
             code,
             expiresAt: Math.floor(Date.now() / 1000) + 600 // 10 minutes TTL
         }
     }).promise();
 };
 
-const getVerificationCode = async (phoneNumber) => {
+const getVerificationCode = async (email) => {
     const result = await dynamodb.get({
-        TableName: PHONE_VERIFICATION_TABLE,
-        Key: { phoneNumber }
+        TableName: EMAIL_VERIFICATION_TABLE,
+        Key: { email }
     }).promise();
     
     return result.Item ? result.Item.code : null;
 };
 
-const deleteVerificationCode = async (phoneNumber) => {
+const deleteVerificationCode = async (email) => {
     await dynamodb.delete({
-        TableName: PHONE_VERIFICATION_TABLE,
-        Key: { phoneNumber }
+        TableName: EMAIL_VERIFICATION_TABLE,
+        Key: { email }
     }).promise();
 };
 
