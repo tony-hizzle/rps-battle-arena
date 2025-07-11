@@ -670,8 +670,10 @@ async function sendVerificationSMS(phoneNumber, code) {
     
     try {
         await sns.publish(params).promise();
+        console.log(`SMS sent successfully to ${phoneNumber}`);
     } catch (error) {
         console.error('SMS send error:', error);
+        console.log(`VERIFICATION CODE for ${phoneNumber}: ${code}`);
         // Don't throw error to avoid blocking registration
     }
 }
