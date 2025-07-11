@@ -4,31 +4,32 @@
 
 ### High-Level Architecture
 ```
-[Frontend (S3/CloudFront)] 
-    ↓ (HTTPS/WSS)
-[API Gateway + WebSocket API]
+[Frontend (S3 Static Website)] 
+    ↓ (HTTPS REST API + Polling)
+[API Gateway REST API]
     ↓
 [Lambda Functions]
     ↓
-[DynamoDB] + [Cognito]
+[DynamoDB Tables]
 ```
 
 ### Architecture Components
 
 #### Frontend Layer
 - **Technology**: HTML5, CSS3, JavaScript (Vanilla JS)
-- **Hosting**: Amazon S3 static website + CloudFront CDN
-- **Features**: Single-page application with real-time WebSocket communication
+- **Hosting**: Amazon S3 static website hosting
+- **Features**: Single-page application with polling-based real-time communication
+- **Session Management**: localStorage for persistent login
 
 #### API Layer
-- **REST API**: Amazon API Gateway for user management and statistics
-- **WebSocket API**: AWS WebSocket API for real-time game communication
-- **Authentication**: Amazon Cognito integration
+- **REST API**: Amazon API Gateway for all communication
+- **Real-time Communication**: Polling-based updates every 2 seconds
+- **Authentication**: Custom username/email registration system
 
 #### Backend Layer
 - **Compute**: AWS Lambda functions (Node.js)
-- **Database**: Amazon DynamoDB
-- **Authentication**: Amazon Cognito User Pools
+- **Database**: Amazon DynamoDB (Users, Games tables)
+- **Authentication**: Custom user management in DynamoDB
 
 ## Database Design
 
@@ -47,35 +48,35 @@ Attributes:
 - wins: Number
 - losses: Number
 - draws: Number
+- waitingForMatch: Boolean (optional)
+- waitingSince: String (optional)
+- currentGameId: String (optional)
 ```
 
 #### Games Table
 ```
 Table: rps-games
 Partition Key: gameId (String)
-Sort Key: timestamp (String)
 Attributes:
 - gameId: String (UUID)
 - player1Id: String
 - player2Id: String
+- player1Name: String
+- player2Name: String
 - player1Move: String (rock/paper/scissors)
 - player2Move: String (rock/paper/scissors)
 - winner: String (player1Id/player2Id/draw)
-- status: String (waiting/active/completed)
+- status: String (active/completed)
+- gameMode: String (computer/multiplayer)
 - createdAt: String (ISO timestamp)
 - completedAt: String (ISO timestamp)
+- timestamp: String (ISO timestamp)
 ```
 
-#### Active Connections Table
+#### Connections Table (Not Used)
 ```
-Table: rps-connections
-Partition Key: connectionId (String)
-Attributes:
-- connectionId: String
-- userId: String
-- status: String (waiting/playing)
-- gameId: String (optional)
-- connectedAt: String (ISO timestamp)
+// WebSocket connections table was planned but not implemented
+// Real-time communication achieved through polling instead
 ```
 
 ## API Design
@@ -83,55 +84,57 @@ Attributes:
 ### REST API Endpoints
 
 #### Authentication
-- `POST /auth/register` - User registration
-- `POST /auth/login` - User login
-- `GET /auth/profile` - Get user profile
+- `POST /auth` - User registration and login
+  - Actions: `register`, `login`
 
 #### Game Management
+- `POST /game` - All game operations
+  - Actions: `find_match`, `play`, `check_game`
 - `GET /stats/{userId}` - Get user statistics
 - `GET /leaderboard` - Get top players
 - `GET /games/{userId}` - Get user's game history
 
-### WebSocket API Events
+### Real-time Communication (Polling)
 
-#### Client → Server
+#### Matchmaking Flow
 ```json
+// Find Match Request
 {
-  "action": "join_queue",
-  "userId": "string"
+  "action": "find_match",
+  "userId": "string",
+  "username": "string"
 }
 
+// Match Found Response
 {
-  "action": "make_move",
-  "gameId": "string",
-  "move": "rock|paper|scissors"
-}
-
-{
-  "action": "disconnect",
-  "userId": "string"
+  "success": true,
+  "data": {
+    "matchFound": true,
+    "opponent": "username",
+    "gameId": "string"
+  }
 }
 ```
 
-#### Server → Client
+#### Game Status Polling
 ```json
+// Check Game Request
 {
-  "type": "game_found",
+  "action": "check_game",
   "gameId": "string",
-  "opponent": "username"
+  "userId": "string"
 }
 
+// Game Complete Response
 {
-  "type": "game_result",
-  "gameId": "string",
-  "yourMove": "rock|paper|scissors",
-  "opponentMove": "rock|paper|scissors",
-  "result": "win|lose|draw"
-}
-
-{
-  "type": "opponent_disconnected",
-  "gameId": "string"
+  "success": true,
+  "data": {
+    "gameComplete": true,
+    "yourMove": "rock|paper|scissors",
+    "opponentMove": "rock|paper|scissors",
+    "result": "win|lose|draw",
+    "opponent": "username"
+  }
 }
 ```
 
@@ -140,35 +143,24 @@ Attributes:
 ### Function Architecture
 ```
 src/
-├── handlers/
-│   ├── auth/
-│   │   ├── register.js
-│   │   ├── login.js
-│   │   └── profile.js
-│   ├── game/
-│   │   ├── stats.js
-│   │   ├── leaderboard.js
-│   │   └── history.js
-│   └── websocket/
-│       ├── connect.js
-│       ├── disconnect.js
-│       ├── joinQueue.js
-│       └── makeMove.js
-├── utils/
-│   ├── db.js
-│   ├── auth.js
-│   └── gameLogic.js
-└── shared/
-    └── response.js
+├── index.js (Main Lambda handler)
+├── websocket.js (Unused WebSocket handler)
+└── Unified handler with actions:
+    ├── Authentication (register/login)
+    ├── Game operations (find_match/play/check_game)
+    ├── Statistics (user stats/leaderboard)
+    ├── Game history
+    └── Utility functions
 ```
 
 ### Core Functions
 
-#### WebSocket Handler (`websocket/handler.js`)
-- Manages WebSocket connections
-- Handles player matching
-- Processes game moves
-- Manages game state
+#### Main Game Handler (`index.js`)
+- Unified REST API handler
+- Manages user authentication
+- Handles matchmaking queue
+- Processes real-time multiplayer games
+- Manages game state with polling
 
 #### Game Logic (`utils/gameLogic.js`)
 ```javascript
@@ -179,7 +171,14 @@ function determineWinner(move1, move2) {
 }
 
 function matchPlayers(waitingPlayers) {
-  // Simple FIFO matching
+  // Queue-based matching with DynamoDB
+  // Players added to waitingForMatch flag
+  // First available player matched
+}
+
+function pollGameStatus(gameId) {
+  // Check game completion every 2 seconds
+  // Return results when both moves made
 }
 ```
 
@@ -207,30 +206,30 @@ function matchPlayers(waitingPlayers) {
 ### State Management
 ```javascript
 const gameState = {
-  user: null,
-  currentGame: null,
-  gameHistory: [],
-  leaderboard: [],
-  websocket: null
+  currentUser: null,
+  gameStats: { totalGames: 0, wins: 0, losses: 0, draws: 0 },
+  gameMode: 'computer', // 'computer' or 'multiplayer'
+  currentGameId: null,
+  gameCheckInterval: null // For polling
 };
 ```
 
 ## Security Considerations
 
 ### Authentication & Authorization
-- Amazon Cognito for secure user authentication
-- JWT tokens for API authorization
-- WebSocket connection validation
+- Custom user registration and login system
+- localStorage session persistence
+- Server-side user validation
 
 ### Input Validation
 - Client-side and server-side move validation
-- Rate limiting on API calls
-- WebSocket message validation
+- API request validation
+- Game state consistency checks
 
 ### Anti-Cheat Measures
 - Server-side game logic validation
-- Move timing validation
-- Connection integrity checks
+- Game state synchronization
+- Matchmaking queue integrity
 
 ## Deployment Strategy
 
@@ -255,25 +254,26 @@ const gameState = {
 ## Performance Optimization
 
 ### Caching Strategy
-- CloudFront for static asset caching
-- DynamoDB DAX for database caching (if needed)
-- API Gateway response caching
+- S3 static website hosting
+- Browser localStorage for session persistence
+- DynamoDB native performance
 
 ### Scalability Considerations
 - Lambda auto-scaling
 - DynamoDB on-demand pricing
-- WebSocket API connection limits
-- Connection pooling strategies
+- Polling frequency optimization
+- Queue management for matchmaking
 
 ## Error Handling
 
 ### Client-Side Error Handling
 - Network connectivity issues
-- WebSocket disconnection recovery
+- Polling timeout handling
+- Matchmaking fallback to computer mode
 - Invalid move handling
 
 ### Server-Side Error Handling
 - Lambda function error handling
 - DynamoDB operation failures
-- WebSocket connection failures
-- Graceful degradation strategies
+- Game state consistency management
+- Matchmaking queue cleanup
