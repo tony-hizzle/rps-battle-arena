@@ -174,6 +174,9 @@
                     <button class="primary-btn" onclick="selectMode('multiplayer')">🎮 Find Online Player</button>
                     <button class="primary-btn" onclick="selectMode('computer')">🤖 Play vs Computer</button>
                 </div>
+                <div style="margin-top: 1rem;">
+                    <button onclick="logout()" style="background: #dc3545; color: white;">Logout</button>
+                </div>
             </div>
             
             <div id="waiting-screen" class="hidden">
@@ -227,6 +230,7 @@
                 <button onclick="showGameHistory()">Game History</button>
                 <button onclick="showLeaderboard()">Leaderboard</button>
                 <button onclick="backToGame()">Back to Game</button>
+                <button onclick="logout()" style="background: #dc3545; color: white; margin-top: 1rem;">Logout</button>
             </div>
             
             <div id="history-screen" class="hidden">
@@ -604,6 +608,28 @@
 
         function backToGame() {
             showScreen('mode-screen');
+        }
+        
+        function logout() {
+            // Clear user data
+            currentUser = null;
+            gameStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
+            gameMode = 'computer';
+            
+            // Cancel any ongoing search
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+                searchTimeout = null;
+            }
+            
+            // Clear form fields
+            document.getElementById('username').value = '';
+            document.getElementById('reg-username').value = '';
+            document.getElementById('reg-email').value = '';
+            
+            // Show login screen
+            showLogin();
+            showScreen('login-screen');
         }
     </script>
 </body>
