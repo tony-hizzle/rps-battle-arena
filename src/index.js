@@ -2,6 +2,12 @@ const { success, error } = require('./shared/response');
 const { createUser, getUser, updateUserStats } = require('./utils/db');
 const { determineWinner, isValidMove } = require('./utils/gameLogic');
 
+function formatPhoneNumber(phoneNumber) {
+    if (!phoneNumber) return phoneNumber;
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    return cleaned.startsWith('1') ? `+${cleaned}` : `+1${cleaned}`;
+}
+
 exports.handler = async (event) => {
     try {
         console.log('Event:', JSON.stringify(event, null, 2));
@@ -18,6 +24,8 @@ exports.handler = async (event) => {
                     return error('Username and phone number are required');
                 }
                 
+                const formattedPhone = formatPhoneNumber(phoneNumber);
+                
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
@@ -27,7 +35,7 @@ exports.handler = async (event) => {
                     FilterExpression: 'username = :username OR phoneNumber = :phone',
                     ExpressionAttributeValues: { 
                         ':username': username,
-                        ':phone': phoneNumber
+                        ':phone': formattedPhone
                     }
                 }).promise();
                 
@@ -44,7 +52,7 @@ exports.handler = async (event) => {
                 await dynamodb.put({
                     TableName: process.env.PHONE_VERIFICATION_TABLE,
                     Item: {
-                        phoneNumber,
+                        phoneNumber: formattedPhone,
                         verificationCode: code,
                         userId,
                         username,
@@ -55,11 +63,11 @@ exports.handler = async (event) => {
                 }).promise();
                 
                 // Send verification SMS
-                await sendVerificationSMS(phoneNumber, code);
+                await sendVerificationSMS(formattedPhone, code);
                 
                 return success({ 
                     message: 'Verification code sent to your phone',
-                    phoneNumber: phoneNumber
+                    phoneNumber: formattedPhone
                 });
             }
             
@@ -68,13 +76,14 @@ exports.handler = async (event) => {
                     return error('Phone number and verification code are required');
                 }
                 
+                const formattedPhone = formatPhoneNumber(phoneNumber);
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
                 // Get verification record
                 const verification = await dynamodb.get({
                     TableName: process.env.PHONE_VERIFICATION_TABLE,
-                    Key: { phoneNumber }
+                    Key: { phoneNumber: formattedPhone }
                 }).promise();
                 
                 if (!verification.Item) {
@@ -99,13 +108,13 @@ exports.handler = async (event) => {
                 const user = await createUser({
                     userId: verificationItem.userId,
                     username: verificationItem.username,
-                    phoneNumber: verificationItem.phoneNumber
+                    phoneNumber: formattedPhone
                 });
                 
                 // Mark as verified
                 await dynamodb.update({
                     TableName: process.env.PHONE_VERIFICATION_TABLE,
-                    Key: { phoneNumber },
+                    Key: { phoneNumber: formattedPhone },
                     UpdateExpression: 'SET verified = :verified',
                     ExpressionAttributeValues: { ':verified': true }
                 }).promise();
@@ -121,13 +130,14 @@ exports.handler = async (event) => {
                     return error('Phone number is required');
                 }
                 
+                const formattedPhone = formatPhoneNumber(phoneNumber);
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
                 // Get existing verification record
                 const verification = await dynamodb.get({
                     TableName: process.env.PHONE_VERIFICATION_TABLE,
-                    Key: { phoneNumber }
+                    Key: { phoneNumber: formattedPhone }
                 }).promise();
                 
                 if (!verification.Item) {
@@ -145,7 +155,7 @@ exports.handler = async (event) => {
                 // Update verification record
                 await dynamodb.update({
                     TableName: process.env.PHONE_VERIFICATION_TABLE,
-                    Key: { phoneNumber },
+                    Key: { phoneNumber: formattedPhone },
                     UpdateExpression: 'SET verificationCode = :code, expiresAt = :expires',
                     ExpressionAttributeValues: {
                         ':code': newCode,
@@ -154,7 +164,7 @@ exports.handler = async (event) => {
                 }).promise();
                 
                 // Send new verification SMS
-                await sendVerificationSMS(phoneNumber, newCode);
+                await sendVerificationSMS(formattedPhone, newCode);
                 
                 return success({ message: 'New verification code sent' });
             }
@@ -164,6 +174,8 @@ exports.handler = async (event) => {
                     return error('Phone number is required');
                 }
                 
+                const formattedPhone = formatPhoneNumber(phoneNumber);
+                
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
@@ -171,7 +183,7 @@ exports.handler = async (event) => {
                 const result = await dynamodb.scan({
                     TableName: process.env.USERS_TABLE,
                     FilterExpression: 'phoneNumber = :phone',
-                    ExpressionAttributeValues: { ':phone': phoneNumber }
+                    ExpressionAttributeValues: { ':phone': formattedPhone }
                 }).promise();
                 
                 if (result.Items.length === 0) {
@@ -188,7 +200,7 @@ exports.handler = async (event) => {
                 await dynamodb.put({
                     TableName: process.env.PHONE_VERIFICATION_TABLE,
                     Item: {
-                        phoneNumber,
+                        phoneNumber: formattedPhone,
                         verificationCode: code,
                         userId: user.userId,
                         username: user.username,
@@ -200,11 +212,11 @@ exports.handler = async (event) => {
                 }).promise();
                 
                 // Send login verification SMS
-                await sendVerificationSMS(phoneNumber, code);
+                await sendVerificationSMS(formattedPhone, code);
                 
                 return success({ 
                     message: 'Login code sent to your phone',
-                    phoneNumber: phoneNumber
+                    phoneNumber: formattedPhone
                 });
             }
             
@@ -213,13 +225,14 @@ exports.handler = async (event) => {
                     return error('Phone number and verification code are required');
                 }
                 
+                const formattedPhone = formatPhoneNumber(phoneNumber);
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
                 // Get verification record
                 const verification = await dynamodb.get({
                     TableName: process.env.PHONE_VERIFICATION_TABLE,
-                    Key: { phoneNumber }
+                    Key: { phoneNumber: formattedPhone }
                 }).promise();
                 
                 if (!verification.Item) {
@@ -249,7 +262,7 @@ exports.handler = async (event) => {
                 // Clean up verification record
                 await dynamodb.delete({
                     TableName: process.env.PHONE_VERIFICATION_TABLE,
-                    Key: { phoneNumber }
+                    Key: { phoneNumber: formattedPhone }
                 }).promise();
                 
                 return success({ 
