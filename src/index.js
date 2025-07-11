@@ -120,16 +120,82 @@ exports.handler = async (event) => {
         
         // Game endpoint
         if (httpMethod === 'POST' && path === '/game') {
-            const { action, userId, move } = requestBody;
+            const { action, userId, move, gameMode } = requestBody;
+            
+            if (action === 'find_match') {
+                // Simple matchmaking simulation
+                const AWS = require('aws-sdk');
+                const dynamodb = new AWS.DynamoDB.DocumentClient();
+                
+                try {
+                    // Check for waiting players
+                    const waitingPlayers = await dynamodb.scan({
+                        TableName: process.env.USERS_TABLE,
+                        FilterExpression: 'attribute_exists(waitingForMatch) AND waitingForMatch = :waiting',
+                        ExpressionAttributeValues: { ':waiting': true }
+                    }).promise();
+                    
+                    if (waitingPlayers.Items.length > 0 && waitingPlayers.Items[0].userId !== userId) {
+                        // Match found
+                        const opponent = waitingPlayers.Items[0];
+                        
+                        // Remove both players from waiting
+                        await dynamodb.update({
+                            TableName: process.env.USERS_TABLE,
+                            Key: { userId: opponent.userId },
+                            UpdateExpression: 'REMOVE waitingForMatch'
+                        }).promise();
+                        
+                        return success({
+                            matchFound: true,
+                            opponent: opponent.username,
+                            gameId: 'match_' + Date.now()
+                        });
+                    } else {
+                        // Add to waiting queue
+                        await dynamodb.update({
+                            TableName: process.env.USERS_TABLE,
+                            Key: { userId },
+                            UpdateExpression: 'SET waitingForMatch = :waiting, waitingSince = :time',
+                            ExpressionAttributeValues: {
+                                ':waiting': true,
+                                ':time': new Date().toISOString()
+                            }
+                        }).promise();
+                        
+                        return success({
+                            matchFound: false,
+                            message: 'Added to matchmaking queue'
+                        });
+                    }
+                } catch (err) {
+                    console.error('Matchmaking error:', err);
+                    return success({
+                        matchFound: false,
+                        message: 'Matchmaking unavailable, play vs computer'
+                    });
+                }
+            }
             
             if (action === 'play') {
                 if (!isValidMove(move)) {
                     return error('Invalid move');
                 }
                 
-                // Simulate opponent move
-                const moves = ['rock', 'paper', 'scissors'];
-                const opponentMove = moves[Math.floor(Math.random() * 3)];
+                // Determine opponent based on game mode
+                let opponent, opponentMove;
+                
+                if (gameMode === 'multiplayer') {
+                    // For multiplayer, still simulate for now
+                    opponent = 'Player_' + Math.floor(Math.random() * 1000);
+                    const moves = ['rock', 'paper', 'scissors'];
+                    opponentMove = moves[Math.floor(Math.random() * 3)];
+                } else {
+                    // Computer opponent
+                    opponent = 'Computer_' + Math.floor(Math.random() * 1000);
+                    const moves = ['rock', 'paper', 'scissors'];
+                    opponentMove = moves[Math.floor(Math.random() * 3)];
+                }
                 
                 const result = determineWinner(move, opponentMove);
                 let gameResult;
@@ -143,7 +209,6 @@ exports.handler = async (event) => {
                 }
                 
                 const gameId = 'game_' + Date.now();
-                const opponent = 'Computer_' + Math.floor(Math.random() * 1000);
                 
                 // Save game record
                 if (userId) {
@@ -162,10 +227,20 @@ exports.handler = async (event) => {
                                 player2Move: opponentMove,
                                 winner: gameResult === 'win' ? userId : gameResult === 'lose' ? opponent : 'draw',
                                 status: 'completed',
+                                gameMode: gameMode || 'computer',
                                 createdAt: new Date().toISOString(),
                                 timestamp: new Date().toISOString()
                             }
                         }).promise();
+                        
+                        // Remove from waiting queue if applicable
+                        if (gameMode === 'multiplayer') {
+                            await dynamodb.update({
+                                TableName: process.env.USERS_TABLE,
+                                Key: { userId },
+                                UpdateExpression: 'REMOVE waitingForMatch, waitingSince'
+                            }).promise();
+                        }
                         
                         // Update user stats
                         await updateUserStats(userId, gameResult === 'win' ? 'wins' : gameResult === 'lose' ? 'losses' : 'draws');

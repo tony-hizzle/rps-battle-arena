@@ -46,10 +46,10 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 ## Technical Requirements
 
 ### AWS Services (Proposed)
-- [ ] Amazon S3 (Static website hosting)
-- [ ] Amazon API Gateway (REST API)
-- [ ] AWS Lambda (Serverless backend logic)
-- [ ] Amazon DynamoDB (User data and game statistics)
+- [x] Amazon S3 (Static website hosting)
+- [x] Amazon API Gateway (REST API)
+- [x] AWS Lambda (Serverless backend logic)
+- [x] Amazon DynamoDB (User data and game statistics)
 - [ ] Amazon Cognito (User authentication)
 - [ ] AWS WebSocket API (Real-time communication)
 - [ ] Amazon CloudFront (Content delivery)
@@ -60,8 +60,8 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 - [ ] Frontend-backend integration
 
 ### Deployment Requirements
-- [ ] Serverless architecture deployment
-- [ ] AWS CDK or CloudFormation for infrastructure
+- [x] Serverless architecture deployment
+- [x] AWS CDK or CloudFormation for infrastructure
 - [ ] Automated deployment pipeline
 
 ## Constraints & Assumptions

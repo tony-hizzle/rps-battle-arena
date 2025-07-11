@@ -128,6 +128,21 @@
             font-weight: bold;
             color: #667eea;
         }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -152,9 +167,26 @@
                 </div>
             </div>
 
+            <div id="mode-screen" class="hidden">
+                <h2>Choose Game Mode</h2>
+                <p>Playing as: <span id="player-name-mode"></span></p>
+                <div>
+                    <button class="primary-btn" onclick="selectMode('multiplayer')">🎮 Find Online Player</button>
+                    <button class="primary-btn" onclick="selectMode('computer')">🤖 Play vs Computer</button>
+                </div>
+            </div>
+            
+            <div id="waiting-screen" class="hidden">
+                <h2>🔍 Finding Player...</h2>
+                <p>Searching for an online opponent</p>
+                <div class="spinner"></div>
+                <button onclick="cancelSearch()">Cancel & Play Computer</button>
+            </div>
+
             <div id="game-screen" class="hidden">
                 <h2>Make Your Move!</h2>
                 <p>Playing as: <span id="player-name"></span></p>
+                <p id="opponent-info">vs Computer</p>
                 <div>
                     <button class="move-btn" onclick="makeMove('rock')">🪨 Rock</button>
                     <button class="move-btn" onclick="makeMove('paper')">📄 Paper</button>
@@ -215,6 +247,8 @@
         const API_URL = 'https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod';
         let currentUser = null;
         let gameStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
+        let gameMode = 'computer';
+        let searchTimeout = null;
 
         function showScreen(screenId) {
             document.querySelectorAll('[id$="-screen"]').forEach(screen => {
@@ -254,7 +288,8 @@
                 if (data.success) {
                     currentUser = data.data.user;
                     document.getElementById('player-name').textContent = username;
-                    showScreen('game-screen');
+                    document.getElementById('player-name-mode').textContent = username;
+                    showScreen('mode-screen');
                     await loadUserStats();
                 } else {
                     alert('Registration failed: ' + data.error);
@@ -284,7 +319,8 @@
                 if (data.success) {
                     currentUser = data.data.user;
                     document.getElementById('player-name').textContent = username;
-                    showScreen('game-screen');
+                    document.getElementById('player-name-mode').textContent = username;
+                    showScreen('mode-screen');
                     await loadUserStats();
                 } else {
                     alert('Login failed: ' + data.error);
@@ -293,7 +329,8 @@
                 // Fallback for offline mode
                 currentUser = { userId: 'offline_' + Date.now(), username };
                 document.getElementById('player-name').textContent = username;
-                showScreen('game-screen');
+                document.getElementById('player-name-mode').textContent = username;
+                showScreen('mode-screen');
             }
         }
 
@@ -307,7 +344,8 @@
                     body: JSON.stringify({
                         action: 'play',
                         move: move,
-                        userId: currentUser?.userId
+                        userId: currentUser?.userId,
+                        gameMode: gameMode
                     })
                 });
 
@@ -385,8 +423,99 @@
             return emojis[move] || move;
         }
 
-        function playAgain() {
+        function selectMode(mode) {
+            gameMode = mode;
+            
+            if (mode === 'multiplayer') {
+                findOnlinePlayer();
+            } else {
+                document.getElementById('opponent-info').textContent = 'vs Computer';
+                showScreen('game-screen');
+            }
+        }
+        
+        async function findOnlinePlayer() {
+            showScreen('waiting-screen');
+            
+            try {
+                const response = await fetch(`${API_URL}/game`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'find_match',
+                        userId: currentUser?.userId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.data.matchFound) {
+                        // Found a match
+                        document.getElementById('opponent-info').textContent = 'vs ' + data.data.opponent;
+                        showScreen('game-screen');
+                    } else {
+                        // Added to queue, wait and check again
+                        searchTimeout = setTimeout(async () => {
+                            await checkForMatch();
+                        }, 2000);
+                    }
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                console.error('Matchmaking error:', error);
+                alert('Matchmaking unavailable. Playing against computer instead.');
+                gameMode = 'computer';
+                document.getElementById('opponent-info').textContent = 'vs Computer';
+                showScreen('game-screen');
+            }
+        }
+        
+        async function checkForMatch() {
+            try {
+                const response = await fetch(`${API_URL}/game`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'find_match',
+                        userId: currentUser?.userId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.data.matchFound) {
+                    document.getElementById('opponent-info').textContent = 'vs ' + data.data.opponent;
+                    showScreen('game-screen');
+                } else {
+                    // Still waiting, timeout after 10 seconds total
+                    searchTimeout = setTimeout(() => {
+                        alert('No online players found. Playing against computer instead.');
+                        gameMode = 'computer';
+                        document.getElementById('opponent-info').textContent = 'vs Computer';
+                        showScreen('game-screen');
+                    }, 8000);
+                }
+            } catch (error) {
+                gameMode = 'computer';
+                document.getElementById('opponent-info').textContent = 'vs Computer';
+                showScreen('game-screen');
+            }
+        }
+        
+        function cancelSearch() {
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+                searchTimeout = null;
+            }
+            gameMode = 'computer';
+            document.getElementById('opponent-info').textContent = 'vs Computer';
             showScreen('game-screen');
+        }
+        
+        function playAgain() {
+            showScreen('mode-screen');
         }
 
         async function loadUserStats() {
@@ -474,7 +603,7 @@
         }
 
         function backToGame() {
-            showScreen('game-screen');
+            showScreen('mode-screen');
         }
     </script>
 </body>
