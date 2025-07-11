@@ -84,6 +84,10 @@ public class InfrastructureStack extends Stack {
 
         Resource gameResource = api.getRoot().addResource("game");
         gameResource.addMethod("POST", new LambdaIntegration(gameFunction));
+        
+        Resource gamesResource = api.getRoot().addResource("games");
+        Resource userGamesResource = gamesResource.addResource("{userId}");
+        userGamesResource.addMethod("GET", new LambdaIntegration(gameFunction));
 
         // S3 Bucket removed for simplified deployment
 

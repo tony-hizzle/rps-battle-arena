@@ -139,8 +139,17 @@
         <div class="card">
             <div id="login-screen">
                 <h2>Join the Battle!</h2>
-                <input type="text" id="username" placeholder="Enter username" required>
-                <button class="primary-btn" onclick="startGame()">Start Playing</button>
+                <div id="login-form">
+                    <input type="text" id="username" placeholder="Enter username" required>
+                    <button class="primary-btn" onclick="loginUser()">Login</button>
+                    <button onclick="showRegister()">New User? Register</button>
+                </div>
+                <div id="register-form" class="hidden">
+                    <input type="text" id="reg-username" placeholder="Choose username" required>
+                    <input type="email" id="reg-email" placeholder="Enter email" required>
+                    <button class="primary-btn" onclick="registerUser()">Register</button>
+                    <button onclick="showLogin()">Back to Login</button>
+                </div>
             </div>
 
             <div id="game-screen" class="hidden">
@@ -183,7 +192,21 @@
                         <span>Draws</span>
                     </div>
                 </div>
+                <button onclick="showGameHistory()">Game History</button>
+                <button onclick="showLeaderboard()">Leaderboard</button>
                 <button onclick="backToGame()">Back to Game</button>
+            </div>
+            
+            <div id="history-screen" class="hidden">
+                <h2>Game History</h2>
+                <div id="game-history"></div>
+                <button onclick="showStats()">Back to Stats</button>
+            </div>
+            
+            <div id="leaderboard-screen" class="hidden">
+                <h2>🏆 Leaderboard</h2>
+                <div id="leaderboard-list"></div>
+                <button onclick="showStats()">Back to Stats</button>
             </div>
         </div>
     </main>
@@ -200,16 +223,78 @@
             document.getElementById(screenId).classList.remove('hidden');
         }
 
-        function startGame() {
+        function showRegister() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+        }
+        
+        function showLogin() {
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+        }
+        
+        async function registerUser() {
+            const username = document.getElementById('reg-username').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            
+            if (!username || !email) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'register', username, email })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentUser = data.data.user;
+                    document.getElementById('player-name').textContent = username;
+                    showScreen('game-screen');
+                    await loadUserStats();
+                } else {
+                    alert('Registration failed: ' + data.error);
+                }
+            } catch (error) {
+                alert('Registration failed. Please try again.');
+            }
+        }
+        
+        async function loginUser() {
             const username = document.getElementById('username').value.trim();
+            
             if (!username) {
                 alert('Please enter a username');
                 return;
             }
             
-            currentUser = username;
-            document.getElementById('player-name').textContent = username;
-            showScreen('game-screen');
+            try {
+                const response = await fetch(`${API_URL}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'login', username })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentUser = data.data.user;
+                    document.getElementById('player-name').textContent = username;
+                    showScreen('game-screen');
+                    await loadUserStats();
+                } else {
+                    alert('Login failed: ' + data.error);
+                }
+            } catch (error) {
+                // Fallback for offline mode
+                currentUser = { userId: 'offline_' + Date.now(), username };
+                document.getElementById('player-name').textContent = username;
+                showScreen('game-screen');
+            }
         }
 
         async function makeMove(move) {
@@ -222,7 +307,7 @@
                     body: JSON.stringify({
                         action: 'play',
                         move: move,
-                        userId: currentUser
+                        userId: currentUser?.userId
                     })
                 });
 
@@ -230,6 +315,7 @@
                 
                 if (data.success) {
                     showResult(data.data);
+                    await loadUserStats(); // Refresh stats after game
                 } else {
                     alert('Game error: ' + data.error);
                 }
@@ -303,12 +389,88 @@
             showScreen('game-screen');
         }
 
+        async function loadUserStats() {
+            if (!currentUser?.userId || currentUser.userId.startsWith('offline_')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/stats/${currentUser.userId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    gameStats = data.data;
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+        
         function showStats() {
-            document.getElementById('total-games').textContent = gameStats.totalGames;
-            document.getElementById('wins').textContent = gameStats.wins;
-            document.getElementById('losses').textContent = gameStats.losses;
-            document.getElementById('draws').textContent = gameStats.draws;
+            document.getElementById('total-games').textContent = gameStats.totalGames || 0;
+            document.getElementById('wins').textContent = gameStats.wins || 0;
+            document.getElementById('losses').textContent = gameStats.losses || 0;
+            document.getElementById('draws').textContent = gameStats.draws || 0;
             showScreen('stats-screen');
+        }
+        
+        async function showGameHistory() {
+            if (!currentUser?.userId || currentUser.userId.startsWith('offline_')) {
+                alert('Game history requires user registration');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/games/${currentUser.userId}`);
+                const data = await response.json();
+                
+                const historyDiv = document.getElementById('game-history');
+                
+                if (data.success && data.data.length > 0) {
+                    historyDiv.innerHTML = data.data.map(game => `
+                        <div class="stat" style="margin-bottom: 1rem;">
+                            <div><strong>vs ${game.opponent}</strong></div>
+                            <div>${getMoveEmoji(game.yourMove)} vs ${getMoveEmoji(game.opponentMove)}</div>
+                            <div style="color: ${game.result === 'win' ? '#28a745' : game.result === 'lose' ? '#dc3545' : '#ffc107'}">
+                                ${game.result.toUpperCase()}
+                            </div>
+                            <div style="font-size: 0.8rem; color: #666;">
+                                ${new Date(game.date).toLocaleDateString()}
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    historyDiv.innerHTML = '<p>No games played yet!</p>';
+                }
+                
+                showScreen('history-screen');
+            } catch (error) {
+                alert('Failed to load game history');
+            }
+        }
+        
+        async function showLeaderboard() {
+            try {
+                const response = await fetch(`${API_URL}/leaderboard`);
+                const data = await response.json();
+                
+                const leaderboardDiv = document.getElementById('leaderboard-list');
+                
+                if (data.success) {
+                    leaderboardDiv.innerHTML = data.data.map(player => `
+                        <div class="stat" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span><strong>#${player.rank} ${player.username}</strong></span>
+                            <span>${player.wins} wins (${player.winRate}%)</span>
+                        </div>
+                    `).join('');
+                } else {
+                    leaderboardDiv.innerHTML = '<p>Failed to load leaderboard</p>';
+                }
+                
+                showScreen('leaderboard-screen');
+            } catch (error) {
+                alert('Failed to load leaderboard');
+            }
         }
 
         function backToGame() {

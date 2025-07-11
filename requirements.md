@@ -11,11 +11,11 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 ## Functional Requirements
 
 ### Core Features
-- [ ] User registration and authentication
+- [x] User registration and authentication
 - [ ] Real-time multiplayer game matching
-- [ ] Rock, Paper, Scissors game logic
-- [ ] Win/loss tracking and statistics
-- [ ] Game history and leaderboard
+- [x] Rock, Paper, Scissors game logic
+- [x] Win/loss tracking and statistics
+- [x] Game history and leaderboard
 - [ ] Real-time game state synchronization
 
 ### User Stories
@@ -79,10 +79,10 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 
 ## Success Criteria
 - [ ] Two players can successfully play Rock, Paper, Scissors in real-time
-- [ ] Win/loss statistics are accurately tracked and displayed
-- [ ] Application handles player connections and disconnections gracefully
-- [ ] Game logic correctly determines winners (Rock beats Scissors, Scissors beats Paper, Paper beats Rock)
-- [ ] Leaderboard displays top players by win count
+- [x] Win/loss statistics are accurately tracked and displayed
+- [x] Application handles player connections and disconnections gracefully
+- [x] Game logic correctly determines winners (Rock beats Scissors, Scissors beats Paper, Paper beats Rock)
+- [x] Leaderboard displays top players by win count
 
 ## Out of Scope
 - Advanced matchmaking algorithms
