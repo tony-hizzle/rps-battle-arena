@@ -161,8 +161,16 @@
                 </div>
                 <div id="register-form" class="hidden">
                     <input type="text" id="reg-username" placeholder="Choose username" required>
-                    <input type="email" id="reg-email" placeholder="Enter email" required>
-                    <button class="primary-btn" onclick="registerUser()">Register</button>
+                    <input type="tel" id="reg-phone" placeholder="Enter phone number (+1234567890)" required>
+                    <button class="primary-btn" onclick="registerUser()">Send Code</button>
+                    <button onclick="showLogin()">Back to Login</button>
+                </div>
+                <div id="verify-form" class="hidden">
+                    <h3>Enter Verification Code</h3>
+                    <p>Code sent to: <span id="verify-phone"></span></p>
+                    <input type="text" id="verify-code" placeholder="Enter 6-digit code" maxlength="6" required>
+                    <button class="primary-btn" onclick="verifyPhone()">Verify</button>
+                    <button onclick="resendCode()">Resend Code</button>
                     <button onclick="showLogin()">Back to Login</button>
                 </div>
             </div>
@@ -295,9 +303,9 @@
         
         async function registerUser() {
             const username = document.getElementById('reg-username').value.trim();
-            const email = document.getElementById('reg-email').value.trim();
+            const phoneNumber = document.getElementById('reg-phone').value.trim();
             
-            if (!username || !email) {
+            if (!username || !phoneNumber) {
                 alert('Please fill in all fields');
                 return;
             }
@@ -306,7 +314,37 @@
                 const response = await fetch(`${API_URL}/auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'register', username, email })
+                    body: JSON.stringify({ action: 'register', username, phoneNumber })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('verify-phone').textContent = phoneNumber;
+                    document.getElementById('register-form').classList.add('hidden');
+                    document.getElementById('verify-form').classList.remove('hidden');
+                } else {
+                    alert('Registration failed: ' + data.error);
+                }
+            } catch (error) {
+                alert('Registration failed. Please try again.');
+            }
+        }
+        
+        async function verifyPhone() {
+            const phoneNumber = document.getElementById('verify-phone').textContent;
+            const verificationCode = document.getElementById('verify-code').value.trim();
+            
+            if (!verificationCode) {
+                alert('Please enter verification code');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'verify_phone', phoneNumber, verificationCode })
                 });
                 
                 const data = await response.json();
@@ -314,15 +352,37 @@
                 if (data.success) {
                     currentUser = data.data.user;
                     localStorage.setItem('rpsUser', JSON.stringify(currentUser));
-                    document.getElementById('player-name').textContent = username;
-                    document.getElementById('player-name-mode').textContent = username;
+                    document.getElementById('player-name').textContent = currentUser.username;
+                    document.getElementById('player-name-mode').textContent = currentUser.username;
                     showScreen('mode-screen');
                     await loadUserStats();
                 } else {
-                    alert('Registration failed: ' + data.error);
+                    alert('Verification failed: ' + data.error);
                 }
             } catch (error) {
-                alert('Registration failed. Please try again.');
+                alert('Verification failed. Please try again.');
+            }
+        }
+        
+        async function resendCode() {
+            const phoneNumber = document.getElementById('verify-phone').textContent;
+            
+            try {
+                const response = await fetch(`${API_URL}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'resend_code', phoneNumber })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('New verification code sent!');
+                } else {
+                    alert('Failed to resend code: ' + data.error);
+                }
+            } catch (error) {
+                alert('Failed to resend code. Please try again.');
             }
         }
         
@@ -772,7 +832,8 @@
             // Clear form fields
             document.getElementById('username').value = '';
             document.getElementById('reg-username').value = '';
-            document.getElementById('reg-email').value = '';
+            document.getElementById('reg-phone').value = '';
+            document.getElementById('verify-code').value = '';
             
             // Show login screen
             showLogin();

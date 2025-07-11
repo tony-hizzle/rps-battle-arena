@@ -73,10 +73,18 @@ Attributes:
 - timestamp: String (ISO timestamp)
 ```
 
-#### Connections Table (Not Used)
+#### Phone Verification Table
 ```
-// WebSocket connections table was planned but not implemented
-// Real-time communication achieved through polling instead
+Table: rps-phone-verification
+Partition Key: phoneNumber (String)
+Attributes:
+- phoneNumber: String (E.164 format)
+- verificationCode: String (6-digit code)
+- userId: String (UUID)
+- username: String
+- createdAt: String (ISO timestamp)
+- expiresAt: Number (TTL timestamp)
+- verified: Boolean
 ```
 
 ## API Design
@@ -85,7 +93,7 @@ Attributes:
 
 #### Authentication
 - `POST /auth` - User registration and login
-  - Actions: `register`, `login`
+  - Actions: `register`, `login`, `verify_phone`, `resend_code`
 
 #### Game Management
 - `POST /game` - All game operations

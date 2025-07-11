@@ -54,10 +54,18 @@ public class InfrastructureStack extends Stack {
                 .code(Code.fromAsset("../src"))
                 .environment(Map.of(
                         "USERS_TABLE", usersTable.getTableName(),
-                        "GAMES_TABLE", gamesTable.getTableName()
+                        "GAMES_TABLE", gamesTable.getTableName(),
+                        "PHONE_VERIFICATION_TABLE", "rps-phone-verification"
                 ))
                 .timeout(Duration.seconds(30))
                 .build();
+                
+        // Grant SNS permissions
+        gameFunction.addToRolePolicy(PolicyStatement.Builder.create()
+                .effect(Effect.ALLOW)
+                .actions(List.of("sns:Publish"))
+                .resources(List.of("*"))
+                .build());
 
         // Grant permissions
         usersTable.grantReadWriteData(gameFunction);
@@ -91,6 +99,21 @@ public class InfrastructureStack extends Stack {
         Resource gamesResource = api.getRoot().addResource("games");
         Resource userGamesResource = gamesResource.addResource("{userId}");
         userGamesResource.addMethod("GET", new LambdaIntegration(gameFunction));
+        
+        // Phone Verification Table
+        Table phoneVerificationTable = Table.Builder.create(this, "RpsPhoneVerificationTable")
+                .tableName("rps-phone-verification")
+                .partitionKey(Attribute.builder()
+                        .name("phoneNumber")
+                        .type(AttributeType.STRING)
+                        .build())
+                .billingMode(BillingMode.PAY_PER_REQUEST)
+                .removalPolicy(software.amazon.awscdk.RemovalPolicy.DESTROY)
+                .timeToLiveAttribute("expiresAt")
+                .build();
+                
+        // Grant permissions to phone verification table
+        phoneVerificationTable.grantReadWriteData(gameFunction);
 
         // S3 Bucket removed for simplified deployment
 

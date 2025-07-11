@@ -11,29 +11,152 @@ exports.handler = async (event) => {
         
         // Authentication endpoints
         if (httpMethod === 'POST' && path === '/auth') {
-            const { action, username, email } = requestBody;
+            const { action, username, phoneNumber, verificationCode } = requestBody;
             
             if (action === 'register') {
-                if (!username || !email) {
-                    return error('Username and email are required');
+                if (!username || !phoneNumber) {
+                    return error('Username and phone number are required');
                 }
                 
-                // Check if user already exists
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
+                // Check if user already exists
                 const existingUser = await dynamodb.scan({
                     TableName: process.env.USERS_TABLE,
-                    FilterExpression: 'username = :username',
-                    ExpressionAttributeValues: { ':username': username }
+                    FilterExpression: 'username = :username OR phoneNumber = :phone',
+                    ExpressionAttributeValues: { 
+                        ':username': username,
+                        ':phone': phoneNumber
+                    }
                 }).promise();
                 
                 if (existingUser.Items.length > 0) {
-                    return error('Username already exists');
+                    return error('Username or phone number already exists');
                 }
                 
-                const user = await createUser({ username, email });
-                return success({ user: { userId: user.userId, username: user.username } });
+                // Generate verification code
+                const code = Math.floor(100000 + Math.random() * 900000).toString();
+                const userId = require('crypto').randomUUID();
+                const expiresAt = Math.floor(Date.now() / 1000) + 900; // 15 minutes
+                
+                // Store verification data
+                await dynamodb.put({
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Item: {
+                        phoneNumber,
+                        verificationCode: code,
+                        userId,
+                        username,
+                        createdAt: new Date().toISOString(),
+                        expiresAt,
+                        verified: false
+                    }
+                }).promise();
+                
+                // Send verification SMS
+                await sendVerificationSMS(phoneNumber, code);
+                
+                return success({ 
+                    message: 'Verification code sent to your phone',
+                    phoneNumber: phoneNumber
+                });
+            }
+            
+            if (action === 'verify_phone') {
+                if (!phoneNumber || !verificationCode) {
+                    return error('Phone number and verification code are required');
+                }
+                
+                const AWS = require('aws-sdk');
+                const dynamodb = new AWS.DynamoDB.DocumentClient();
+                
+                // Get verification record
+                const verification = await dynamodb.get({
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber }
+                }).promise();
+                
+                if (!verification.Item) {
+                    return error('Verification record not found');
+                }
+                
+                const verificationItem = verification.Item;
+                
+                if (verificationItem.verified) {
+                    return error('Phone number already verified');
+                }
+                
+                if (verificationItem.verificationCode !== verificationCode) {
+                    return error('Invalid verification code');
+                }
+                
+                if (Date.now() / 1000 > verificationItem.expiresAt) {
+                    return error('Verification code expired');
+                }
+                
+                // Create user account
+                const user = await createUser({
+                    userId: verificationItem.userId,
+                    username: verificationItem.username,
+                    phoneNumber: verificationItem.phoneNumber
+                });
+                
+                // Mark as verified
+                await dynamodb.update({
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber },
+                    UpdateExpression: 'SET verified = :verified',
+                    ExpressionAttributeValues: { ':verified': true }
+                }).promise();
+                
+                return success({ 
+                    user: { userId: user.userId, username: user.username },
+                    message: 'Phone number verified successfully'
+                });
+            }
+            
+            if (action === 'resend_code') {
+                if (!phoneNumber) {
+                    return error('Phone number is required');
+                }
+                
+                const AWS = require('aws-sdk');
+                const dynamodb = new AWS.DynamoDB.DocumentClient();
+                
+                // Get existing verification record
+                const verification = await dynamodb.get({
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber }
+                }).promise();
+                
+                if (!verification.Item) {
+                    return error('No pending verification found');
+                }
+                
+                if (verification.Item.verified) {
+                    return error('Phone number already verified');
+                }
+                
+                // Generate new code
+                const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+                const newExpiresAt = Math.floor(Date.now() / 1000) + 900; // 15 minutes
+                
+                // Update verification record
+                await dynamodb.update({
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber },
+                    UpdateExpression: 'SET verificationCode = :code, expiresAt = :expires',
+                    ExpressionAttributeValues: {
+                        ':code': newCode,
+                        ':expires': newExpiresAt
+                    }
+                }).promise();
+                
+                // Send new verification SMS
+                await sendVerificationSMS(phoneNumber, newCode);
+                
+                return success({ message: 'New verification code sent' });
             }
             
             if (action === 'login') {
@@ -457,3 +580,22 @@ exports.handler = async (event) => {
         return error('Internal server error', 500);
     }
 };
+
+async function sendVerificationSMS(phoneNumber, code) {
+    const AWS = require('aws-sdk');
+    const sns = new AWS.SNS({ region: 'us-east-1' });
+    
+    const message = `RPS Battle Arena verification code: ${code}. This code expires in 15 minutes.`;
+    
+    const params = {
+        PhoneNumber: phoneNumber,
+        Message: message
+    };
+    
+    try {
+        await sns.publish(params).promise();
+    } catch (error) {
+        console.error('SMS send error:', error);
+        // Don't throw error to avoid blocking registration
+    }
+}
