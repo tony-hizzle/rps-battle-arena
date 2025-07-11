@@ -17,12 +17,14 @@ exports.handler = async (event) => {
         
         // Authentication endpoints
         if (httpMethod === 'POST' && path === '/auth') {
-            const { action, username, email, verificationCode } = requestBody;
+            const { action, username, phoneNumber, verificationCode } = requestBody;
             
             if (action === 'register') {
-                if (!username || !email) {
-                    return error('Username and email are required');
+                if (!username || !phoneNumber) {
+                    return error('Username and phone number are required');
                 }
+                
+                const formattedPhone = formatPhoneNumber(phoneNumber);
                 
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
@@ -30,15 +32,15 @@ exports.handler = async (event) => {
                 // Check if user already exists
                 const existingUser = await dynamodb.scan({
                     TableName: process.env.USERS_TABLE,
-                    FilterExpression: 'username = :username OR email = :email',
+                    FilterExpression: 'username = :username OR phoneNumber = :phone',
                     ExpressionAttributeValues: { 
                         ':username': username,
-                        ':email': email
+                        ':phone': formattedPhone
                     }
                 }).promise();
                 
                 if (existingUser.Items.length > 0) {
-                    return error('Username or email already exists');
+                    return error('Username or phone number already exists');
                 }
                 
                 // Generate verification code
@@ -48,9 +50,9 @@ exports.handler = async (event) => {
                 
                 // Store verification data
                 await dynamodb.put({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
                     Item: {
-                        email: email,
+                        phoneNumber: formattedPhone,
                         verificationCode: code,
                         userId,
                         username,
@@ -60,27 +62,28 @@ exports.handler = async (event) => {
                     }
                 }).promise();
                 
-                // Send verification email
-                await sendVerificationEmail(email, code);
+                // Send verification SMS
+                await sendVerificationSMS(formattedPhone, code);
                 
                 return success({ 
-                    message: 'Verification code sent to your email',
-                    email: email
+                    message: 'Verification code sent to your phone',
+                    phoneNumber: formattedPhone
                 });
             }
             
-            if (action === 'verify_email') {
-                if (!email || !verificationCode) {
-                    return error('Email and verification code are required');
+            if (action === 'verify_phone') {
+                if (!phoneNumber || !verificationCode) {
+                    return error('Phone number and verification code are required');
                 }
                 
+                const formattedPhone = formatPhoneNumber(phoneNumber);
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
                 // Get verification record
                 const verification = await dynamodb.get({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email }
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber: formattedPhone }
                 }).promise();
                 
                 if (!verification.Item) {
@@ -90,7 +93,7 @@ exports.handler = async (event) => {
                 const verificationItem = verification.Item;
                 
                 if (verificationItem.verified) {
-                    return error('Email already verified');
+                    return error('Phone number already verified');
                 }
                 
                 if (verificationItem.verificationCode !== verificationCode) {
@@ -105,35 +108,36 @@ exports.handler = async (event) => {
                 const user = await createUser({
                     userId: verificationItem.userId,
                     username: verificationItem.username,
-                    email: email
+                    phoneNumber: formattedPhone
                 });
                 
                 // Mark as verified
                 await dynamodb.update({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email },
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber: formattedPhone },
                     UpdateExpression: 'SET verified = :verified',
                     ExpressionAttributeValues: { ':verified': true }
                 }).promise();
                 
                 return success({ 
                     user: { userId: user.userId, username: user.username },
-                    message: 'Email verified successfully'
+                    message: 'Phone number verified successfully'
                 });
             }
             
             if (action === 'resend_code') {
-                if (!email) {
-                    return error('Email is required');
+                if (!phoneNumber) {
+                    return error('Phone number is required');
                 }
                 
+                const formattedPhone = formatPhoneNumber(phoneNumber);
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
                 // Get existing verification record
                 const verification = await dynamodb.get({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email }
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber: formattedPhone }
                 }).promise();
                 
                 if (!verification.Item) {
@@ -141,7 +145,7 @@ exports.handler = async (event) => {
                 }
                 
                 if (verification.Item.verified) {
-                    return error('Email already verified');
+                    return error('Phone number already verified');
                 }
                 
                 // Generate new code
@@ -150,8 +154,8 @@ exports.handler = async (event) => {
                 
                 // Update verification record
                 await dynamodb.update({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email },
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber: formattedPhone },
                     UpdateExpression: 'SET verificationCode = :code, expiresAt = :expires',
                     ExpressionAttributeValues: {
                         ':code': newCode,
@@ -159,29 +163,30 @@ exports.handler = async (event) => {
                     }
                 }).promise();
                 
-                // Send new verification email
-                await sendVerificationEmail(email, newCode);
+                // Send new verification SMS
+                await sendVerificationSMS(formattedPhone, newCode);
                 
                 return success({ message: 'New verification code sent' });
             }
             
             if (action === 'login') {
-                if (!email) {
-                    return error('Email is required');
+                if (!phoneNumber) {
+                    return error('Phone number is required');
                 }
                 
+                const formattedPhone = formatPhoneNumber(phoneNumber);
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
-                // Find existing user by email
+                // Find existing user by phone number
                 const result = await dynamodb.scan({
                     TableName: process.env.USERS_TABLE,
-                    FilterExpression: 'email = :email',
-                    ExpressionAttributeValues: { ':email': email }
+                    FilterExpression: 'phoneNumber = :phone',
+                    ExpressionAttributeValues: { ':phone': formattedPhone }
                 }).promise();
                 
                 if (result.Items.length === 0) {
-                    return error('Email not found. Please register first.');
+                    return error('Phone number not found. Please register first.');
                 }
                 
                 const user = result.Items[0];
@@ -192,9 +197,9 @@ exports.handler = async (event) => {
                 
                 // Store login verification data
                 await dynamodb.put({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
                     Item: {
-                        email: email,
+                        phoneNumber: formattedPhone,
                         verificationCode: code,
                         userId: user.userId,
                         username: user.username,
@@ -205,27 +210,28 @@ exports.handler = async (event) => {
                     }
                 }).promise();
                 
-                // Send login verification email
-                await sendVerificationEmail(email, code);
+                // Send login verification SMS
+                await sendVerificationSMS(formattedPhone, code);
                 
                 return success({ 
-                    message: 'Login code sent to your email',
-                    email: email
+                    message: 'Login code sent to your phone',
+                    phoneNumber: formattedPhone
                 });
             }
             
             if (action === 'verify_login') {
-                if (!email || !verificationCode) {
-                    return error('Email and verification code are required');
+                if (!phoneNumber || !verificationCode) {
+                    return error('Phone number and verification code are required');
                 }
                 
+                const formattedPhone = formatPhoneNumber(phoneNumber);
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
                 // Get verification record
                 const verification = await dynamodb.get({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email }
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber: formattedPhone }
                 }).promise();
                 
                 if (!verification.Item) {
@@ -254,8 +260,8 @@ exports.handler = async (event) => {
                 
                 // Clean up verification record
                 await dynamodb.delete({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email }
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber: formattedPhone }
                 }).promise();
                 
                 return success({ 
@@ -663,28 +669,22 @@ exports.handler = async (event) => {
     }
 };
 
-async function sendVerificationEmail(email, code) {
-    console.log(`VERIFICATION CODE for ${email}: ${code}`);
+async function sendVerificationSMS(phoneNumber, code) {
+    console.log(`VERIFICATION CODE for ${phoneNumber}: ${code}`);
     
     const AWS = require('aws-sdk');
-    const ses = new AWS.SES({ region: 'us-east-1' });
+    const sns = new AWS.SNS({ region: 'us-east-1' });
     
-    const params = {
-        Source: 'noreply@example.com',
-        Destination: { ToAddresses: [email] },
-        Message: {
-            Subject: { Data: 'RPS Battle Arena - Verification Code' },
-            Body: {
-                Text: { Data: `Your RPS Battle Arena verification code is: ${code}\n\nThis code expires in 15 minutes.` }
-            }
-        }
-    };
+    const message = `RPS Battle Arena verification code: ${code}. This code expires in 15 minutes.`;
     
     try {
-        await ses.sendEmail(params).promise();
-        console.log(`Email sent successfully to ${email}`);
+        await sns.publish({
+            PhoneNumber: phoneNumber,
+            Message: message
+        }).promise();
+        console.log(`SMS sent successfully to ${phoneNumber}`);
     } catch (error) {
-        console.error('Email send error:', error);
-        console.log(`EMAIL FAILED - Use verification code: ${code}`);
+        console.error('SMS send error:', error);
+        console.log(`SMS FAILED - Use verification code: ${code}`);
     }
 }

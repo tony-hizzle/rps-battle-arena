@@ -11,8 +11,9 @@ const PHONE_VERIFICATION_TABLE = process.env.PHONE_VERIFICATION_TABLE;
 // User operations
 const createUser = async (userData) => {
     const user = {
-        userId: uuidv4(),
-        ...userData,
+        userId: userData.userId || uuidv4(),
+        username: userData.username,
+        phoneNumber: userData.phoneNumber,
         createdAt: new Date().toISOString(),
         totalGames: 0,
         wins: 0,
