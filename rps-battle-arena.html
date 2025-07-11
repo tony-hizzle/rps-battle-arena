@@ -254,6 +254,8 @@
         let gameStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
         let gameMode = 'computer';
         let searchTimeout = null;
+        let currentGameId = null;
+        let gameCheckInterval = null;
         
         // Check for saved login on page load
         window.addEventListener('load', function() {
@@ -362,32 +364,74 @@
         }
 
         async function makeMove(move) {
-            try {
-                const response = await fetch(`${API_URL}/game`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        action: 'play',
-                        move: move,
-                        userId: currentUser?.userId,
-                        gameMode: gameMode
-                    })
-                });
-
-                const data = await response.json();
-                
-                if (data.success) {
-                    showResult(data.data);
-                    await loadUserStats(); // Refresh stats after game
-                } else {
-                    alert('Game error: ' + data.error);
+            if (gameMode === 'multiplayer' && currentGameId) {
+                // Real multiplayer move
+                try {
+                    const response = await fetch(`${API_URL}/game`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'play',
+                            move: move,
+                            userId: currentUser?.userId,
+                            gameMode: 'multiplayer',
+                            gameId: currentGameId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        if (data.data.gameComplete) {
+                            // Game completed immediately (both moves made)
+                            showResult(data.data);
+                            currentGameId = null;
+                            await loadUserStats();
+                        } else {
+                            // Waiting for opponent's move
+                            document.getElementById('game-screen').innerHTML = `
+                                <h2>Move Sent!</h2>
+                                <p>You played: ${getMoveEmoji(move)}</p>
+                                <p>Waiting for opponent...</p>
+                                <div class="spinner"></div>
+                            `;
+                            
+                            // Start checking for game completion
+                            gameCheckInterval = setInterval(checkGameStatus, 2000);
+                        }
+                    } else {
+                        alert('Game error: ' + data.error);
+                    }
+                } catch (error) {
+                    console.error('Multiplayer game error:', error);
+                    alert('Connection error. Try again.');
                 }
-            } catch (error) {
-                console.error('API Error:', error);
-                // Fallback to local simulation
-                simulateGame(move);
+            } else {
+                // Computer game
+                try {
+                    const response = await fetch(`${API_URL}/game`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'play',
+                            move: move,
+                            userId: currentUser?.userId,
+                            gameMode: 'computer'
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showResult(data.data);
+                        await loadUserStats();
+                    } else {
+                        alert('Game error: ' + data.error);
+                    }
+                } catch (error) {
+                    console.error('API Error:', error);
+                    simulateGame(move);
+                }
             }
         }
 
@@ -461,6 +505,36 @@
             }
         }
         
+        async function checkGameStatus() {
+            if (!currentGameId) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/game`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'check_game',
+                        gameId: currentGameId,
+                        userId: currentUser?.userId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.data.gameComplete) {
+                        // Game completed, show results
+                        clearInterval(gameCheckInterval);
+                        showResult(data.data);
+                        currentGameId = null;
+                        await loadUserStats();
+                    }
+                }
+            } catch (error) {
+                console.error('Game check error:', error);
+            }
+        }
+        
         async function findOnlinePlayer() {
             showScreen('waiting-screen');
             
@@ -470,7 +544,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         action: 'find_match',
-                        userId: currentUser?.userId
+                        userId: currentUser?.userId,
+                        username: currentUser?.username
                     })
                 });
                 
@@ -478,14 +553,53 @@
                 
                 if (data.success) {
                     if (data.data.matchFound) {
-                        // Found a match
+                        // Match found immediately
+                        currentGameId = data.data.gameId;
                         document.getElementById('opponent-info').textContent = 'vs ' + data.data.opponent;
                         showScreen('game-screen');
                     } else {
-                        // Added to queue, wait and check again
-                        searchTimeout = setTimeout(async () => {
-                            await checkForMatch();
-                        }, 2000);
+                        // Added to queue, keep checking
+                        let attempts = 0;
+                        const maxAttempts = 10;
+                        
+                        const checkForMatch = async () => {
+                            attempts++;
+                            
+                            if (attempts > maxAttempts) {
+                                alert('No online players found. Playing against computer instead.');
+                                gameMode = 'computer';
+                                document.getElementById('opponent-info').textContent = 'vs Computer';
+                                showScreen('game-screen');
+                                return;
+                            }
+                            
+                            try {
+                                const matchResponse = await fetch(`${API_URL}/game`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        action: 'find_match',
+                                        userId: currentUser?.userId,
+                                        username: currentUser?.username
+                                    })
+                                });
+                                
+                                const matchData = await matchResponse.json();
+                                
+                                if (matchData.success && matchData.data.matchFound) {
+                                    currentGameId = matchData.data.gameId;
+                                    document.getElementById('opponent-info').textContent = 'vs ' + matchData.data.opponent;
+                                    showScreen('game-screen');
+                                } else {
+                                    setTimeout(checkForMatch, 2000);
+                                }
+                            } catch (error) {
+                                console.error('Match check error:', error);
+                                setTimeout(checkForMatch, 2000);
+                            }
+                        };
+                        
+                        setTimeout(checkForMatch, 2000);
                     }
                 } else {
                     throw new Error(data.error);
@@ -638,9 +752,16 @@
             currentUser = null;
             gameStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
             gameMode = 'computer';
+            currentGameId = null;
             
             // Clear localStorage
             localStorage.removeItem('rpsUser');
+            
+            // Clear intervals
+            if (gameCheckInterval) {
+                clearInterval(gameCheckInterval);
+                gameCheckInterval = null;
+            }
             
             // Cancel any ongoing search
             if (searchTimeout) {

@@ -8,10 +8,13 @@ import software.amazon.awscdk.services.dynamodb.*;
 import software.amazon.awscdk.services.lambda.*;
 import software.amazon.awscdk.services.lambda.Runtime;
 import software.amazon.awscdk.services.apigateway.*;
+import software.amazon.awscdk.services.apigatewayv2.*;
+
 import software.amazon.awscdk.services.s3.*;
 import software.amazon.awscdk.services.cloudfront.*;
 import software.amazon.awscdk.services.cloudfront.origins.*;
 import software.amazon.awscdk.CfnOutput;
+import software.amazon.awscdk.services.iam.*;
 import java.util.Map;
 import java.util.List;
 

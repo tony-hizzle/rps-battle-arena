@@ -123,7 +123,6 @@ exports.handler = async (event) => {
             const { action, userId, move, gameMode } = requestBody;
             
             if (action === 'find_match') {
-                // Simple matchmaking simulation
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
@@ -131,25 +130,54 @@ exports.handler = async (event) => {
                     // Check for waiting players
                     const waitingPlayers = await dynamodb.scan({
                         TableName: process.env.USERS_TABLE,
-                        FilterExpression: 'attribute_exists(waitingForMatch) AND waitingForMatch = :waiting',
-                        ExpressionAttributeValues: { ':waiting': true }
+                        FilterExpression: 'attribute_exists(waitingForMatch) AND waitingForMatch = :waiting AND userId <> :currentUser',
+                        ExpressionAttributeValues: { 
+                            ':waiting': true,
+                            ':currentUser': userId
+                        }
                     }).promise();
                     
-                    if (waitingPlayers.Items.length > 0 && waitingPlayers.Items[0].userId !== userId) {
+                    if (waitingPlayers.Items.length > 0) {
                         // Match found
                         const opponent = waitingPlayers.Items[0];
+                        const gameId = 'match_' + Date.now();
+                        
+                        // Create active game
+                        await dynamodb.put({
+                            TableName: process.env.GAMES_TABLE,
+                            Item: {
+                                gameId,
+                                player1Id: userId,
+                                player2Id: opponent.userId,
+                                player1Name: requestBody.username || 'Player1',
+                                player2Name: opponent.username,
+                                status: 'active',
+                                waitingForMoves: true,
+                                createdAt: new Date().toISOString(),
+                                timestamp: new Date().toISOString()
+                            }
+                        }).promise();
                         
                         // Remove both players from waiting
-                        await dynamodb.update({
-                            TableName: process.env.USERS_TABLE,
-                            Key: { userId: opponent.userId },
-                            UpdateExpression: 'REMOVE waitingForMatch'
-                        }).promise();
+                        await Promise.all([
+                            dynamodb.update({
+                                TableName: process.env.USERS_TABLE,
+                                Key: { userId: opponent.userId },
+                                UpdateExpression: 'REMOVE waitingForMatch, waitingSince SET currentGameId = :gameId',
+                                ExpressionAttributeValues: { ':gameId': gameId }
+                            }).promise(),
+                            dynamodb.update({
+                                TableName: process.env.USERS_TABLE,
+                                Key: { userId },
+                                UpdateExpression: 'REMOVE waitingForMatch, waitingSince SET currentGameId = :gameId',
+                                ExpressionAttributeValues: { ':gameId': gameId }
+                            }).promise()
+                        ]);
                         
                         return success({
                             matchFound: true,
                             opponent: opponent.username,
-                            gameId: 'match_' + Date.now()
+                            gameId: gameId
                         });
                     } else {
                         // Add to waiting queue
@@ -177,38 +205,178 @@ exports.handler = async (event) => {
                 }
             }
             
+            if (action === 'check_game') {
+                const AWS = require('aws-sdk');
+                const dynamodb = new AWS.DynamoDB.DocumentClient();
+                
+                try {
+                    const game = await dynamodb.get({
+                        TableName: process.env.GAMES_TABLE,
+                        Key: { gameId: requestBody.gameId }
+                    }).promise();
+                    
+                    if (!game.Item) {
+                        return error('Game not found');
+                    }
+                    
+                    const gameItem = game.Item;
+                    const isPlayer1 = userId === gameItem.player1Id;
+                    
+                    if (gameItem.status === 'completed') {
+                        // Game completed, return results
+                        const result = gameItem.winner === userId ? 'win' : 
+                                     gameItem.winner === 'draw' ? 'draw' : 'lose';
+                        
+                        return success({
+                            gameComplete: true,
+                            yourMove: isPlayer1 ? gameItem.player1Move : gameItem.player2Move,
+                            opponentMove: isPlayer1 ? gameItem.player2Move : gameItem.player1Move,
+                            result: result,
+                            opponent: isPlayer1 ? gameItem.player2Name : gameItem.player1Name
+                        });
+                    } else {
+                        return success({
+                            gameComplete: false,
+                            waitingForOpponent: !gameItem.player1Move || !gameItem.player2Move
+                        });
+                    }
+                } catch (err) {
+                    console.error('Check game error:', err);
+                    return error('Failed to check game status');
+                }
+            }
+            
             if (action === 'play') {
                 if (!isValidMove(move)) {
                     return error('Invalid move');
                 }
                 
-                // Determine opponent based on game mode
-                let opponent, opponentMove;
+                const AWS = require('aws-sdk');
+                const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
-                if (gameMode === 'multiplayer') {
-                    // For multiplayer, still simulate for now
-                    opponent = 'Player_' + Math.floor(Math.random() * 1000);
-                    const moves = ['rock', 'paper', 'scissors'];
-                    opponentMove = moves[Math.floor(Math.random() * 3)];
+                if (gameMode === 'multiplayer' && requestBody.gameId) {
+                    // Real multiplayer game
+                    const gameId = requestBody.gameId;
+                    
+                    try {
+                        // Get current game
+                        const game = await dynamodb.get({
+                            TableName: process.env.GAMES_TABLE,
+                            Key: { gameId }
+                        }).promise();
+                        
+                        if (!game.Item) {
+                            return error('Game not found');
+                        }
+                        
+                        const gameItem = game.Item;
+                        const isPlayer1 = userId === gameItem.player1Id;
+                        
+                        // Update game with player's move
+                        const updateExpression = isPlayer1 ? 
+                            'SET player1Move = :move' : 
+                            'SET player2Move = :move';
+                        
+                        await dynamodb.update({
+                            TableName: process.env.GAMES_TABLE,
+                            Key: { gameId },
+                            UpdateExpression: updateExpression,
+                            ExpressionAttributeValues: { ':move': move }
+                        }).promise();
+                        
+                        // Get updated game to check if both moves are made
+                        const updatedGame = await dynamodb.get({
+                            TableName: process.env.GAMES_TABLE,
+                            Key: { gameId }
+                        }).promise();
+                        
+                        const updatedGameItem = updatedGame.Item;
+                        
+                        if (updatedGameItem.player1Move && updatedGameItem.player2Move) {
+                            // Both moves made, determine winner
+                            const result = determineWinner(updatedGameItem.player1Move, updatedGameItem.player2Move);
+                            let winner = 'draw';
+                            
+                            if (result === 'player1') {
+                                winner = updatedGameItem.player1Id;
+                            } else if (result === 'player2') {
+                                winner = updatedGameItem.player2Id;
+                            }
+                            
+                            // Update game as completed
+                            await dynamodb.update({
+                                TableName: process.env.GAMES_TABLE,
+                                Key: { gameId },
+                                UpdateExpression: 'SET winner = :winner, #status = :status, completedAt = :completedAt',
+                                ExpressionAttributeNames: { '#status': 'status' },
+                                ExpressionAttributeValues: {
+                                    ':winner': winner,
+                                    ':status': 'completed',
+                                    ':completedAt': new Date().toISOString()
+                                }
+                            }).promise();
+                            
+                            // Update player stats
+                            const playerResult = winner === userId ? 'win' : winner === 'draw' ? 'draw' : 'lose';
+                            await updateUserStats(userId, playerResult);
+                            
+                            const opponentId = isPlayer1 ? updatedGameItem.player2Id : updatedGameItem.player1Id;
+                            const opponentResult = winner === opponentId ? 'win' : winner === 'draw' ? 'draw' : 'lose';
+                            await updateUserStats(opponentId, opponentResult);
+                            
+                            // Clear current game from users
+                            await Promise.all([
+                                dynamodb.update({
+                                    TableName: process.env.USERS_TABLE,
+                                    Key: { userId },
+                                    UpdateExpression: 'REMOVE currentGameId'
+                                }).promise(),
+                                dynamodb.update({
+                                    TableName: process.env.USERS_TABLE,
+                                    Key: { userId: opponentId },
+                                    UpdateExpression: 'REMOVE currentGameId'
+                                }).promise()
+                            ]);
+                            
+                            return success({
+                                gameId,
+                                yourMove: isPlayer1 ? updatedGameItem.player1Move : updatedGameItem.player2Move,
+                                opponentMove: isPlayer1 ? updatedGameItem.player2Move : updatedGameItem.player1Move,
+                                result: playerResult,
+                                opponent: isPlayer1 ? updatedGameItem.player2Name : updatedGameItem.player1Name,
+                                gameComplete: true
+                            });
+                        } else {
+                            // Waiting for opponent's move
+                            return success({
+                                gameId,
+                                yourMove: move,
+                                waitingForOpponent: true,
+                                gameComplete: false
+                            });
+                        }
+                    } catch (err) {
+                        console.error('Multiplayer game error:', err);
+                        return error('Game error occurred');
+                    }
                 } else {
                     // Computer opponent
-                    opponent = 'Computer_' + Math.floor(Math.random() * 1000);
+                    const opponent = 'Computer_' + Math.floor(Math.random() * 1000);
                     const moves = ['rock', 'paper', 'scissors'];
-                    opponentMove = moves[Math.floor(Math.random() * 3)];
-                }
-                
-                const result = determineWinner(move, opponentMove);
-                let gameResult;
-                
-                if (result === 'draw') {
-                    gameResult = 'draw';
-                } else if (result === 'player1') {
-                    gameResult = 'win';
-                } else {
-                    gameResult = 'lose';
-                }
-                
-                const gameId = 'game_' + Date.now();
+                    const opponentMove = moves[Math.floor(Math.random() * 3)];
+                    
+                    const result = determineWinner(move, opponentMove);
+                    let gameResult;
+                    
+                    if (result === 'draw') {
+                        gameResult = 'draw';
+                    } else if (result === 'player1') {
+                        gameResult = 'win';
+                    } else {
+                        gameResult = 'lose';
+                    }
+                    
+                    const gameId = 'game_' + Date.now();
                 
                 // Save game record
                 if (userId) {
@@ -227,20 +395,11 @@ exports.handler = async (event) => {
                                 player2Move: opponentMove,
                                 winner: gameResult === 'win' ? userId : gameResult === 'lose' ? opponent : 'draw',
                                 status: 'completed',
-                                gameMode: gameMode || 'computer',
+                                gameMode: 'computer',
                                 createdAt: new Date().toISOString(),
                                 timestamp: new Date().toISOString()
                             }
                         }).promise();
-                        
-                        // Remove from waiting queue if applicable
-                        if (gameMode === 'multiplayer') {
-                            await dynamodb.update({
-                                TableName: process.env.USERS_TABLE,
-                                Key: { userId },
-                                UpdateExpression: 'REMOVE waitingForMatch, waitingSince'
-                            }).promise();
-                        }
                         
                         // Update user stats
                         await updateUserStats(userId, gameResult === 'win' ? 'wins' : gameResult === 'lose' ? 'losses' : 'draws');
@@ -249,13 +408,15 @@ exports.handler = async (event) => {
                     }
                 }
                 
-                return success({
-                    gameId,
-                    yourMove: move,
-                    opponentMove: opponentMove,
-                    result: gameResult,
-                    opponent
-                });
+                    return success({
+                        gameId,
+                        yourMove: move,
+                        opponentMove: opponentMove,
+                        result: gameResult,
+                        opponent,
+                        gameComplete: true
+                    });
+                }
             }
         }
         
