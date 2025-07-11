@@ -93,7 +93,7 @@ Attributes:
 
 #### Authentication
 - `POST /auth` - User registration and login
-  - Actions: `register`, `login`, `verify_phone`, `resend_code`
+  - Actions: `register`, `login`, `verify_phone`, `verify_login`, `resend_code`
 
 #### Game Management
 - `POST /game` - All game operations

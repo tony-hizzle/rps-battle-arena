@@ -155,9 +155,17 @@
             <div id="login-screen">
                 <h2>Join the Battle!</h2>
                 <div id="login-form">
-                    <input type="text" id="username" placeholder="Enter username" required>
-                    <button class="primary-btn" onclick="loginUser()">Login</button>
+                    <input type="tel" id="login-phone" placeholder="Enter phone number (+1234567890)" required>
+                    <button class="primary-btn" onclick="loginUser()">Send Login Code</button>
                     <button onclick="showRegister()">New User? Register</button>
+                </div>
+                <div id="login-verify-form" class="hidden">
+                    <h3>Enter Login Code</h3>
+                    <p>Code sent to: <span id="login-verify-phone"></span></p>
+                    <input type="text" id="login-verify-code" placeholder="Enter 6-digit code" maxlength="6" required>
+                    <button class="primary-btn" onclick="verifyLogin()">Login</button>
+                    <button onclick="resendLoginCode()">Resend Code</button>
+                    <button onclick="showLogin()">Back</button>
                 </div>
                 <div id="register-form" class="hidden">
                     <input type="text" id="reg-username" placeholder="Choose username" required>
@@ -298,6 +306,8 @@
         
         function showLogin() {
             document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('verify-form').classList.add('hidden');
+            document.getElementById('login-verify-form').classList.add('hidden');
             document.getElementById('login-form').classList.remove('hidden');
         }
         
@@ -387,10 +397,10 @@
         }
         
         async function loginUser() {
-            const username = document.getElementById('username').value.trim();
+            const phoneNumber = document.getElementById('login-phone').value.trim();
             
-            if (!username) {
-                alert('Please enter a username');
+            if (!phoneNumber) {
+                alert('Please enter a phone number');
                 return;
             }
             
@@ -398,7 +408,37 @@
                 const response = await fetch(`${API_URL}/auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'login', username })
+                    body: JSON.stringify({ action: 'login', phoneNumber })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('login-verify-phone').textContent = phoneNumber;
+                    document.getElementById('login-form').classList.add('hidden');
+                    document.getElementById('login-verify-form').classList.remove('hidden');
+                } else {
+                    alert('Login failed: ' + data.error);
+                }
+            } catch (error) {
+                alert('Login failed. Please try again.');
+            }
+        }
+        
+        async function verifyLogin() {
+            const phoneNumber = document.getElementById('login-verify-phone').textContent;
+            const verificationCode = document.getElementById('login-verify-code').value.trim();
+            
+            if (!verificationCode) {
+                alert('Please enter verification code');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'verify_login', phoneNumber, verificationCode })
                 });
                 
                 const data = await response.json();
@@ -406,20 +446,37 @@
                 if (data.success) {
                     currentUser = data.data.user;
                     localStorage.setItem('rpsUser', JSON.stringify(currentUser));
-                    document.getElementById('player-name').textContent = username;
-                    document.getElementById('player-name-mode').textContent = username;
+                    document.getElementById('player-name').textContent = currentUser.username;
+                    document.getElementById('player-name-mode').textContent = currentUser.username;
                     showScreen('mode-screen');
                     await loadUserStats();
                 } else {
-                    alert('Login failed: ' + data.error);
+                    alert('Login verification failed: ' + data.error);
                 }
             } catch (error) {
-                // Fallback for offline mode
-                currentUser = { userId: 'offline_' + Date.now(), username };
-                localStorage.setItem('rpsUser', JSON.stringify(currentUser));
-                document.getElementById('player-name').textContent = username;
-                document.getElementById('player-name-mode').textContent = username;
-                showScreen('mode-screen');
+                alert('Login verification failed. Please try again.');
+            }
+        }
+        
+        async function resendLoginCode() {
+            const phoneNumber = document.getElementById('login-verify-phone').textContent;
+            
+            try {
+                const response = await fetch(`${API_URL}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'login', phoneNumber })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('New login code sent!');
+                } else {
+                    alert('Failed to resend code: ' + data.error);
+                }
+            } catch (error) {
+                alert('Failed to resend code. Please try again.');
             }
         }
 
@@ -830,7 +887,8 @@
             }
             
             // Clear form fields
-            document.getElementById('username').value = '';
+            document.getElementById('login-phone').value = '';
+            document.getElementById('login-verify-code').value = '';
             document.getElementById('reg-username').value = '';
             document.getElementById('reg-phone').value = '';
             document.getElementById('verify-code').value = '';

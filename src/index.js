@@ -160,26 +160,102 @@ exports.handler = async (event) => {
             }
             
             if (action === 'login') {
-                if (!username) {
-                    return error('Username is required');
+                if (!phoneNumber) {
+                    return error('Phone number is required');
                 }
                 
-                // Find existing user
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
+                // Find existing user by phone number
                 const result = await dynamodb.scan({
                     TableName: process.env.USERS_TABLE,
-                    FilterExpression: 'username = :username',
-                    ExpressionAttributeValues: { ':username': username }
+                    FilterExpression: 'phoneNumber = :phone',
+                    ExpressionAttributeValues: { ':phone': phoneNumber }
                 }).promise();
                 
                 if (result.Items.length === 0) {
-                    return error('User not found. Please register first.');
+                    return error('Phone number not found. Please register first.');
                 }
                 
                 const user = result.Items[0];
-                return success({ user: { userId: user.userId, username: user.username } });
+                
+                // Generate login verification code
+                const code = Math.floor(100000 + Math.random() * 900000).toString();
+                const expiresAt = Math.floor(Date.now() / 1000) + 300; // 5 minutes for login
+                
+                // Store login verification data
+                await dynamodb.put({
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Item: {
+                        phoneNumber,
+                        verificationCode: code,
+                        userId: user.userId,
+                        username: user.username,
+                        createdAt: new Date().toISOString(),
+                        expiresAt,
+                        verified: false,
+                        loginAttempt: true
+                    }
+                }).promise();
+                
+                // Send login verification SMS
+                await sendVerificationSMS(phoneNumber, code);
+                
+                return success({ 
+                    message: 'Login code sent to your phone',
+                    phoneNumber: phoneNumber
+                });
+            }
+            
+            if (action === 'verify_login') {
+                if (!phoneNumber || !verificationCode) {
+                    return error('Phone number and verification code are required');
+                }
+                
+                const AWS = require('aws-sdk');
+                const dynamodb = new AWS.DynamoDB.DocumentClient();
+                
+                // Get verification record
+                const verification = await dynamodb.get({
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber }
+                }).promise();
+                
+                if (!verification.Item) {
+                    return error('Verification record not found');
+                }
+                
+                const verificationItem = verification.Item;
+                
+                if (verificationItem.verificationCode !== verificationCode) {
+                    return error('Invalid verification code');
+                }
+                
+                if (Date.now() / 1000 > verificationItem.expiresAt) {
+                    return error('Verification code expired');
+                }
+                
+                // Get user data
+                const user = await dynamodb.get({
+                    TableName: process.env.USERS_TABLE,
+                    Key: { userId: verificationItem.userId }
+                }).promise();
+                
+                if (!user.Item) {
+                    return error('User not found');
+                }
+                
+                // Clean up verification record
+                await dynamodb.delete({
+                    TableName: process.env.PHONE_VERIFICATION_TABLE,
+                    Key: { phoneNumber }
+                }).promise();
+                
+                return success({ 
+                    user: { userId: user.Item.userId, username: user.Item.username },
+                    message: 'Login successful'
+                });
             }
         }
         
