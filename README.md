@@ -25,15 +25,41 @@ Working with the user, the agent will implement the project step by step, first 
 
 Once all planning steps are completed and documented, and the user is ready to proceed, the agent will begin implementing the tasks one at a time until the project is completed.
 
+## 🚀 Live Application
+
+**Frontend URL**: http://rps-battle-arena-frontend-1752192633.s3-website-us-east-1.amazonaws.com
+**API URL**: https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod/
+
+### API Endpoints
+- `POST /auth` - User authentication
+- `GET /leaderboard` - Top players leaderboard  
+- `GET /stats/{userId}` - User statistics
+- `POST /game` - Play Rock Paper Scissors
+
+### Test the API
+```bash
+# Get leaderboard
+curl "https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod/leaderboard"
+
+# Play a game
+curl -X POST "https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod/game" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"play","move":"rock"}'
+```
+
 ## Project layout 
 
 * requirements.md: Defines the requirements for this project
 * design.md: Defines the design and architecture for this project
-* tasks.md: Lists the discrete tasks that need to be executed in order to successfully implement the project. Each task has a check box [ ] that is checked off when the task has been successfully completed. A git commit should be performed after any task is successfully completed.
+* tasks.md: Lists the discrete tasks that need to be executed in order to successfully implement the project
+* infrastructure/: AWS CDK Java project for infrastructure deployment
+* src/: Lambda function source code (Node.js)
+* frontend/: Web application (HTML/CSS/JavaScript)
 
-Depending on the type of project the user decides to build, and at the user's discretion, the agent may suggest adding some additional files to the project layout:
+## Deployment Architecture
 
-* test-plan.md: Describes unit test, integration, non-functional, performance test plans as needed.
-* threat-model.md: Comprehensive application security threat model for the application including security testing plan
-* a11y.md: Describes the accessibility goals for the project and accessibility testing plan
+- **Frontend**: S3 Static Website Hosting
+- **Backend**: AWS Lambda + API Gateway
+- **Database**: Amazon DynamoDB
+- **Infrastructure**: AWS CDK (Java)
 

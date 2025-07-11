@@ -2,9 +2,7 @@ class RPSGame {
     constructor() {
         this.user = null;
         this.currentGame = null;
-        this.apiUrl = window.location.origin.includes('localhost') ? 
-            'https://YOUR_API_GATEWAY_URL' : // Will be replaced with actual URL
-            '/api'; // For local development
+        this.apiUrl = 'https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod';
         
         this.initializeEventListeners();
         this.showScreen('login-screen');

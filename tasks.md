@@ -10,7 +10,7 @@
 - [x] Configure WebSocket API Gateway
 - [x] Set up S3 bucket for static hosting
 - [x] Configure CloudFront distribution
-- [ ] Deploy initial infrastructure
+- [x] Deploy initial infrastructure
 
 ### Development Environment
 - [x] Initialize Node.js project for Lambda functions
@@ -126,11 +126,11 @@
 ## Phase 5: Deployment & Production
 
 ### Production Deployment
-- [ ] Deploy backend infrastructure to production
-- [ ] Deploy Lambda functions
-- [ ] Deploy frontend to S3/CloudFront
-- [ ] Configure production environment variables
-- [ ] Test production deployment
+- [x] Deploy backend infrastructure to production
+- [x] Deploy Lambda functions
+- [x] Deploy frontend to S3/CloudFront
+- [x] Configure production environment variables
+- [x] Test production deployment
 
 ### Monitoring & Logging
 - [ ] Set up CloudWatch monitoring
