@@ -46,16 +46,27 @@ class RPSGame {
         if (!username) return;
 
         try {
-            // Simplified login - in production, use proper authentication
-            this.user = {
-                userId: 'user_' + Date.now(),
-                username: username
-            };
+            const response = await fetch(`${this.apiUrl}/auth`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'login',
+                    username: username
+                })
+            });
 
-            document.getElementById('username').textContent = username;
-            document.getElementById('user-info').classList.remove('hidden');
+            const data = await response.json();
             
-            this.showMainMenu();
+            if (data.success) {
+                this.user = data.data.user;
+                document.getElementById('username').textContent = this.user.username;
+                document.getElementById('user-info').classList.remove('hidden');
+                this.showMainMenu();
+            } else {
+                throw new Error(data.error);
+            }
         } catch (error) {
             console.error('Login failed:', error);
             alert('Login failed. Please try again.');

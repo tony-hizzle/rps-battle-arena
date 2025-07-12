@@ -54,18 +54,10 @@ public class InfrastructureStack extends Stack {
                 .code(Code.fromAsset("../src"))
                 .environment(Map.of(
                         "USERS_TABLE", usersTable.getTableName(),
-                        "GAMES_TABLE", gamesTable.getTableName(),
-                        "EMAIL_VERIFICATION_TABLE", "rps-email-verification"
+                        "GAMES_TABLE", gamesTable.getTableName()
                 ))
                 .timeout(Duration.seconds(30))
                 .build();
-                
-        // Grant SES permissions
-        gameFunction.addToRolePolicy(PolicyStatement.Builder.create()
-                .effect(Effect.ALLOW)
-                .actions(List.of("ses:SendEmail", "ses:SendRawEmail"))
-                .resources(List.of("*"))
-                .build());
 
         // Grant permissions
         usersTable.grantReadWriteData(gameFunction);
@@ -99,21 +91,6 @@ public class InfrastructureStack extends Stack {
         Resource gamesResource = api.getRoot().addResource("games");
         Resource userGamesResource = gamesResource.addResource("{userId}");
         userGamesResource.addMethod("GET", new LambdaIntegration(gameFunction));
-        
-        // Email Verification Table
-        Table emailVerificationTable = Table.Builder.create(this, "RpsEmailVerificationTable")
-                .tableName("rps-email-verification")
-                .partitionKey(Attribute.builder()
-                        .name("email")
-                        .type(AttributeType.STRING)
-                        .build())
-                .billingMode(BillingMode.PAY_PER_REQUEST)
-                .removalPolicy(software.amazon.awscdk.RemovalPolicy.DESTROY)
-                .timeToLiveAttribute("expiresAt")
-                .build();
-                
-        // Grant permissions to email verification table
-        emailVerificationTable.grantReadWriteData(gameFunction);
 
         // S3 Bucket removed for simplified deployment
 

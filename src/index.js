@@ -17,7 +17,24 @@ exports.handler = async (event) => {
         
         // Authentication endpoints
         if (httpMethod === 'POST' && path === '/auth') {
-            const { action, username, email, verificationCode } = requestBody;
+            const { action, username, email } = requestBody;
+            
+            if (action === 'login') {
+                if (!username || !email) {
+                    return error('Username and email are required');
+                }
+                
+                const user = await getUser(username);
+                if (!user) {
+                    return error('Username not found', 404);
+                }
+                
+                if (user.email !== email) {
+                    return error('Email does not match');
+                }
+                
+                return success({ user: { userId: user.userId, username: user.username } });
+            }
             
             if (action === 'register') {
                 if (!username || !email) {
@@ -27,8 +44,7 @@ exports.handler = async (event) => {
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
-                // Check if user already exists
-                const existingUser = await dynamodb.scan({
+                const existingUsers = await dynamodb.scan({
                     TableName: process.env.USERS_TABLE,
                     FilterExpression: 'username = :username OR email = :email',
                     ExpressionAttributeValues: { 
@@ -37,233 +53,18 @@ exports.handler = async (event) => {
                     }
                 }).promise();
                 
-                if (existingUser.Items.length > 0) {
-                    return error('Username or email already exists');
-                }
-                
-                // Generate verification code
-                const code = Math.floor(100000 + Math.random() * 900000).toString();
-                const userId = require('crypto').randomUUID();
-                const expiresAt = Math.floor(Date.now() / 1000) + 900; // 15 minutes
-                
-                // Store verification data
-                await dynamodb.put({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Item: {
-                        email: email,
-                        verificationCode: code,
-                        userId,
-                        username,
-                        createdAt: new Date().toISOString(),
-                        expiresAt,
-                        verified: false
+                if (existingUsers.Items.length > 0) {
+                    const existingUser = existingUsers.Items[0];
+                    if (existingUser.username === username) {
+                        return error('Username already exists');
                     }
-                }).promise();
-                
-                // Send verification email
-                await sendVerificationEmail(email, code);
-                
-                return success({ 
-                    message: 'Verification code sent to your email',
-                    email: email,
-                    verificationCode: code
-                });
-            }
-            
-            if (action === 'verify_email') {
-                if (!email || !verificationCode) {
-                    return error('Email and verification code are required');
-                }
-                
-                const AWS = require('aws-sdk');
-                const dynamodb = new AWS.DynamoDB.DocumentClient();
-                
-                // Get verification record
-                const verification = await dynamodb.get({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email }
-                }).promise();
-                
-                if (!verification.Item) {
-                    return error('Verification record not found');
-                }
-                
-                const verificationItem = verification.Item;
-                
-                if (verificationItem.verified) {
-                    return error('Email already verified');
-                }
-                
-                if (verificationItem.verificationCode !== verificationCode) {
-                    return error('Invalid verification code');
-                }
-                
-                if (Date.now() / 1000 > verificationItem.expiresAt) {
-                    return error('Verification code expired');
-                }
-                
-                // Create user account
-                const user = await createUser({
-                    userId: verificationItem.userId,
-                    username: verificationItem.username,
-                    email: email
-                });
-                
-                // Mark as verified
-                await dynamodb.update({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email },
-                    UpdateExpression: 'SET verified = :verified',
-                    ExpressionAttributeValues: { ':verified': true }
-                }).promise();
-                
-                return success({ 
-                    user: { userId: user.userId, username: user.username },
-                    message: 'Email verified successfully'
-                });
-            }
-            
-            if (action === 'resend_code') {
-                if (!email) {
-                    return error('Email is required');
-                }
-                
-                const AWS = require('aws-sdk');
-                const dynamodb = new AWS.DynamoDB.DocumentClient();
-                
-                // Get existing verification record
-                const verification = await dynamodb.get({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email }
-                }).promise();
-                
-                if (!verification.Item) {
-                    return error('No pending verification found');
-                }
-                
-                if (verification.Item.verified) {
-                    return error('Email already verified');
-                }
-                
-                // Generate new code
-                const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-                const newExpiresAt = Math.floor(Date.now() / 1000) + 900; // 15 minutes
-                
-                // Update verification record
-                await dynamodb.update({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email },
-                    UpdateExpression: 'SET verificationCode = :code, expiresAt = :expires',
-                    ExpressionAttributeValues: {
-                        ':code': newCode,
-                        ':expires': newExpiresAt
+                    if (existingUser.email === email) {
+                        return error('Email already exists');
                     }
-                }).promise();
-                
-                // Send new verification email
-                await sendVerificationEmail(email, newCode);
-                
-                return success({ message: 'New verification code sent' });
-            }
-            
-            if (action === 'login') {
-                if (!email) {
-                    return error('Email is required');
                 }
                 
-                const AWS = require('aws-sdk');
-                const dynamodb = new AWS.DynamoDB.DocumentClient();
-                
-                // Find existing user by email
-                const result = await dynamodb.scan({
-                    TableName: process.env.USERS_TABLE,
-                    FilterExpression: 'email = :email',
-                    ExpressionAttributeValues: { ':email': email }
-                }).promise();
-                
-                if (result.Items.length === 0) {
-                    return error('Email not found. Please register first.');
-                }
-                
-                const user = result.Items[0];
-                
-                // Generate login verification code
-                const code = Math.floor(100000 + Math.random() * 900000).toString();
-                const expiresAt = Math.floor(Date.now() / 1000) + 300; // 5 minutes for login
-                
-                // Store login verification data
-                await dynamodb.put({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Item: {
-                        email: email,
-                        verificationCode: code,
-                        userId: user.userId,
-                        username: user.username,
-                        createdAt: new Date().toISOString(),
-                        expiresAt,
-                        verified: false,
-                        loginAttempt: true
-                    }
-                }).promise();
-                
-                // Send login verification email
-                await sendVerificationEmail(email, code);
-                
-                return success({ 
-                    message: 'Login code sent to your email',
-                    email: email,
-                    verificationCode: code
-                });
-            }
-            
-            if (action === 'verify_login') {
-                if (!email || !verificationCode) {
-                    return error('Email and verification code are required');
-                }
-                
-                const AWS = require('aws-sdk');
-                const dynamodb = new AWS.DynamoDB.DocumentClient();
-                
-                // Get verification record
-                const verification = await dynamodb.get({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email }
-                }).promise();
-                
-                if (!verification.Item) {
-                    return error('Verification record not found');
-                }
-                
-                const verificationItem = verification.Item;
-                
-                if (verificationItem.verificationCode !== verificationCode) {
-                    return error('Invalid verification code');
-                }
-                
-                if (Date.now() / 1000 > verificationItem.expiresAt) {
-                    return error('Verification code expired');
-                }
-                
-                // Get user data
-                const user = await dynamodb.get({
-                    TableName: process.env.USERS_TABLE,
-                    Key: { userId: verificationItem.userId }
-                }).promise();
-                
-                if (!user.Item) {
-                    return error('User not found');
-                }
-                
-                // Clean up verification record
-                await dynamodb.delete({
-                    TableName: process.env.EMAIL_VERIFICATION_TABLE,
-                    Key: { email: email }
-                }).promise();
-                
-                return success({ 
-                    user: { userId: user.Item.userId, username: user.Item.username },
-                    message: 'Login successful'
-                });
+                const user = await createUser({ username, email });
+                return success({ user: { userId: user.userId, username: user.username } });
             }
         }
         
@@ -327,14 +128,50 @@ exports.handler = async (event) => {
         
         // Game endpoint
         if (httpMethod === 'POST' && path === '/game') {
-            const { action, userId, move, gameMode } = requestBody;
+            const { action, userId, move, gameMode, timestamp, browser } = requestBody;
             
             if (action === 'find_match') {
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
                 try {
-                    // Check for waiting players
+                    // First check if this user already has an active game
+                    const userResult = await dynamodb.get({
+                        TableName: process.env.USERS_TABLE,
+                        Key: { userId }
+                    }).promise();
+                    
+                    if (userResult.Item && userResult.Item.currentGameId) {
+                        // User already has a game, get game details
+                        const gameResult = await dynamodb.get({
+                            TableName: process.env.GAMES_TABLE,
+                            Key: { gameId: userResult.Item.currentGameId }
+                        }).promise();
+                        
+                        if (gameResult.Item && gameResult.Item.status === 'active') {
+                            const game = gameResult.Item;
+                            const isPlayer1 = userId === game.player1Id;
+                            const opponentName = isPlayer1 ? game.player2Name : game.player1Name;
+                            
+                            console.log(`Found active game for user ${userId}: ${game.gameId} at ${timestamp || 'no-timestamp'}`);
+                            
+                            return success({
+                                matchFound: true,
+                                opponent: opponentName,
+                                gameId: game.gameId
+                            });
+                        } else {
+                            // Game is completed or doesn't exist, clear all game-related states
+                            console.log(`Clearing stale game reference for user ${userId} at ${timestamp || 'no-timestamp'}`);
+                            await dynamodb.update({
+                                TableName: process.env.USERS_TABLE,
+                                Key: { userId },
+                                UpdateExpression: 'REMOVE currentGameId, waitingForMatch, waitingSince, matchedAt'
+                            }).promise();
+                        }
+                    }
+                    
+                    // Simple matchmaking: check for any waiting players
                     const waitingPlayers = await dynamodb.scan({
                         TableName: process.env.USERS_TABLE,
                         FilterExpression: 'attribute_exists(waitingForMatch) AND waitingForMatch = :waiting AND userId <> :currentUser',
@@ -344,28 +181,31 @@ exports.handler = async (event) => {
                         }
                     }).promise();
                     
+                    console.log(`Found ${waitingPlayers.Items.length} waiting players for user ${userId}`);
+                    
                     if (waitingPlayers.Items.length > 0) {
-                        // Match found
+                        // Match found - create game
                         const opponent = waitingPlayers.Items[0];
                         const gameId = 'match_' + Date.now();
                         
-                        // Create active game
+                        console.log(`Creating match: ${gameId} between ${opponent.userId} and ${userId}`);
+                        
+                        // Create game
                         await dynamodb.put({
                             TableName: process.env.GAMES_TABLE,
                             Item: {
                                 gameId,
-                                player1Id: userId,
-                                player2Id: opponent.userId,
-                                player1Name: requestBody.username || 'Player1',
-                                player2Name: opponent.username,
+                                player1Id: opponent.userId,
+                                player2Id: userId,
+                                player1Name: opponent.username,
+                                player2Name: requestBody.username || 'Player2',
                                 status: 'active',
-                                waitingForMoves: true,
                                 createdAt: new Date().toISOString(),
                                 timestamp: new Date().toISOString()
                             }
                         }).promise();
                         
-                        // Remove both players from waiting
+                        // Update both players
                         await Promise.all([
                             dynamodb.update({
                                 TableName: process.env.USERS_TABLE,
@@ -376,11 +216,12 @@ exports.handler = async (event) => {
                             dynamodb.update({
                                 TableName: process.env.USERS_TABLE,
                                 Key: { userId },
-                                UpdateExpression: 'REMOVE waitingForMatch, waitingSince SET currentGameId = :gameId',
+                                UpdateExpression: 'SET currentGameId = :gameId',
                                 ExpressionAttributeValues: { ':gameId': gameId }
                             }).promise()
                         ]);
                         
+                        console.log(`Match created: ${gameId}`);
                         return success({
                             matchFound: true,
                             opponent: opponent.username,
@@ -398,6 +239,7 @@ exports.handler = async (event) => {
                             }
                         }).promise();
                         
+                        console.log(`User ${userId} added to waiting queue (${browser || 'unknown'} browser)`);
                         return success({
                             matchFound: false,
                             message: 'Added to matchmaking queue'
@@ -525,23 +367,35 @@ exports.handler = async (event) => {
                             
                             // Update player stats
                             const playerResult = winner === userId ? 'win' : winner === 'draw' ? 'draw' : 'lose';
-                            await updateUserStats(userId, playerResult);
+                            if (playerResult === 'win') {
+                                await updateUserStats(userId, 'wins');
+                            } else if (playerResult === 'lose') {
+                                await updateUserStats(userId, 'losses');
+                            } else {
+                                await updateUserStats(userId, 'draws');
+                            }
                             
                             const opponentId = isPlayer1 ? updatedGameItem.player2Id : updatedGameItem.player1Id;
                             const opponentResult = winner === opponentId ? 'win' : winner === 'draw' ? 'draw' : 'lose';
-                            await updateUserStats(opponentId, opponentResult);
+                            if (opponentResult === 'win') {
+                                await updateUserStats(opponentId, 'wins');
+                            } else if (opponentResult === 'lose') {
+                                await updateUserStats(opponentId, 'losses');
+                            } else {
+                                await updateUserStats(opponentId, 'draws');
+                            }
                             
-                            // Clear current game from users
+                            // Clear current game and any waiting states from users
                             await Promise.all([
                                 dynamodb.update({
                                     TableName: process.env.USERS_TABLE,
                                     Key: { userId },
-                                    UpdateExpression: 'REMOVE currentGameId'
+                                    UpdateExpression: 'REMOVE currentGameId, waitingForMatch, waitingSince, matchedAt'
                                 }).promise(),
                                 dynamodb.update({
                                     TableName: process.env.USERS_TABLE,
                                     Key: { userId: opponentId },
-                                    UpdateExpression: 'REMOVE currentGameId'
+                                    UpdateExpression: 'REMOVE currentGameId, waitingForMatch, waitingSince, matchedAt'
                                 }).promise()
                             ]);
                             
@@ -609,7 +463,13 @@ exports.handler = async (event) => {
                         }).promise();
                         
                         // Update user stats
-                        await updateUserStats(userId, gameResult === 'win' ? 'wins' : gameResult === 'lose' ? 'losses' : 'draws');
+                        if (gameResult === 'win') {
+                            await updateUserStats(userId, 'wins');
+                        } else if (gameResult === 'lose') {
+                            await updateUserStats(userId, 'losses');
+                        } else {
+                            await updateUserStats(userId, 'draws');
+                        }
                     } catch (err) {
                         console.log('Game save failed:', err);
                     }
@@ -670,28 +530,3 @@ exports.handler = async (event) => {
     }
 };
 
-async function sendVerificationEmail(email, code) {
-    console.log(`VERIFICATION CODE for ${email}: ${code}`);
-    
-    const AWS = require('aws-sdk');
-    const ses = new AWS.SES({ region: 'us-east-1' });
-    
-    const params = {
-        Source: 'noreply@example.com',
-        Destination: { ToAddresses: [email] },
-        Message: {
-            Subject: { Data: 'RPS Battle Arena - Verification Code' },
-            Body: {
-                Text: { Data: `Your RPS Battle Arena verification code is: ${code}\n\nThis code expires in 15 minutes.` }
-            }
-        }
-    };
-    
-    try {
-        await ses.sendEmail(params).promise();
-        console.log(`Email sent successfully to ${email}`);
-    } catch (error) {
-        console.error('Email send error:', error);
-        console.log(`EMAIL FAILED - Use verification code: ${code}`);
-    }
-}
