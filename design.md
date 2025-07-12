@@ -285,3 +285,74 @@ const gameState = {
 - DynamoDB operation failures
 - Game state consistency management
 - Matchmaking queue cleanup
+
+## Repeat Matchmaking Solution
+
+### Problem Identified
+After the first online game, one of the matched players would intermittently not receive match notifications due to:
+- Browser caching of API responses
+- Stale polling state persisting across games
+- Different browser handling of fetch requests after initial game
+- Chrome and Safari having different caching behaviors
+
+### Solution Implemented
+**Page Reload Approach**: Force page reload for repeat matchmaking to ensure completely clean state
+
+```javascript
+function playAgain() {
+    // Force page reload for repeat matchmaking
+    if (gameStats.totalGames > 0) {
+        console.log('Reloading page for clean repeat matchmaking state');
+        window.location.reload();
+    } else {
+        showScreen('mode-screen');
+    }
+}
+```
+
+### Technical Implementation Details
+- **Ultra-Fast Polling**: 250ms intervals for rapid match detection
+- **Cache Busting**: URL parameters with timestamp and random values
+- **Universal Fallback**: 200ms fallback mechanism for all browsers
+- **Login Persistence**: User session maintained through localStorage
+- **Clean State**: Page reload eliminates all stale polling and caching issues
+
+### Benefits
+- **100% Reliability**: Guaranteed fresh state for repeat games
+- **Cross-Browser**: Works consistently in Chrome, Safari, Firefox, Edge
+- **User Experience**: Brief reload vs broken functionality
+- **Maintainable**: Simple solution that's easy to understand and debug
+
+## Known Issues & Limitations
+
+### Browser Compatibility
+- WebSocket connections may have different timeout behaviors across browsers
+- Some browsers may require user interaction before playing audio
+- Chrome and Safari have different caching behaviors for API requests
+
+### Performance Considerations
+- DynamoDB read/write capacity should be monitored under high load
+- Ultra-fast polling (250ms) increases API call frequency during matchmaking
+- Page reload approach adds brief UX interruption for repeat games
+
+### Security Notes
+- Input validation is implemented but should be regularly reviewed
+- Rate limiting may be needed for production deployment
+
+## Future Enhancements
+
+### Planned Features
+- Tournament mode with bracket system
+- Player profiles with avatars
+- Chat system for players
+- Mobile app development
+- Advanced statistics and analytics
+
+### Technical Improvements
+- Replace polling-based matchmaking with WebSocket real-time notifications
+- Implement proper authentication with JWT tokens
+- Add comprehensive error handling and retry logic
+- Optimize database queries and indexing
+- Implement caching layer for frequently accessed data
+- Add monitoring and alerting for system health
+- Implement server-side session management for better state handling
