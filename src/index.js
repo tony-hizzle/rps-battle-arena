@@ -271,8 +271,55 @@ exports.handler = async (event) => {
                     const gameItem = game.Item;
                     const isPlayer1 = userId === gameItem.player1Id;
                     
-                    if (gameItem.status === 'completed') {
-                        // Game completed, return results
+                    // Check for timeout (1 minute)
+                    const gameAge = Date.now() - new Date(gameItem.createdAt).getTime();
+                    const TIMEOUT_MS = 1 * 60 * 1000; // 1 minute
+                    
+                    if (gameItem.status === 'active' && gameAge > TIMEOUT_MS) {
+                        // Game timed out, mark as completed
+                        await dynamodb.update({
+                            TableName: process.env.GAMES_TABLE,
+                            Key: { gameId: requestBody.gameId },
+                            UpdateExpression: 'SET #status = :status, winner = :winner, completedAt = :completedAt',
+                            ExpressionAttributeNames: { '#status': 'status' },
+                            ExpressionAttributeValues: {
+                                ':status': 'timeout',
+                                ':winner': 'timeout',
+                                ':completedAt': new Date().toISOString()
+                            }
+                        }).promise();
+                        
+                        // Clear game from both players
+                        await Promise.all([
+                            dynamodb.update({
+                                TableName: process.env.USERS_TABLE,
+                                Key: { userId: gameItem.player1Id },
+                                UpdateExpression: 'REMOVE currentGameId, waitingForMatch, waitingSince, matchedAt'
+                            }).promise(),
+                            dynamodb.update({
+                                TableName: process.env.USERS_TABLE,
+                                Key: { userId: gameItem.player2Id },
+                                UpdateExpression: 'REMOVE currentGameId, waitingForMatch, waitingSince, matchedAt'
+                            }).promise()
+                        ]);
+                        
+                        return success({
+                            gameComplete: true,
+                            timeout: true,
+                            message: 'Game was terminated due to time limit (1 minute)'
+                        });
+                    }
+                    
+                    if (gameItem.status === 'completed' || gameItem.status === 'timeout') {
+                        if (gameItem.status === 'timeout') {
+                            return success({
+                                gameComplete: true,
+                                timeout: true,
+                                message: 'Game was terminated due to time limit (1 minute)'
+                            });
+                        }
+                        
+                        // Game completed normally, return results
                         const result = gameItem.winner === userId ? 'win' : 
                                      gameItem.winner === 'draw' ? 'draw' : 'lose';
                         
@@ -292,6 +339,51 @@ exports.handler = async (event) => {
                 } catch (err) {
                     console.error('Check game error:', err);
                     return error('Failed to check game status');
+                }
+            }
+            
+            if (action === 'cancel_move') {
+                const AWS = require('aws-sdk');
+                const dynamodb = new AWS.DynamoDB.DocumentClient();
+                
+                try {
+                    const game = await dynamodb.get({
+                        TableName: process.env.GAMES_TABLE,
+                        Key: { gameId: requestBody.gameId }
+                    }).promise();
+                    
+                    if (!game.Item) {
+                        return error('Game not found');
+                    }
+                    
+                    const gameItem = game.Item;
+                    const isPlayer1 = userId === gameItem.player1Id;
+                    
+                    // Check if game is still active
+                    if (gameItem.status !== 'active') {
+                        return error('Game is no longer active');
+                    }
+                    
+                    // Check if both moves are already made
+                    if (gameItem.player1Move && gameItem.player2Move) {
+                        return error('Cannot cancel move - game already completed');
+                    }
+                    
+                    // Remove the player's move
+                    const updateExpression = isPlayer1 ? 
+                        'REMOVE player1Move' : 
+                        'REMOVE player2Move';
+                    
+                    await dynamodb.update({
+                        TableName: process.env.GAMES_TABLE,
+                        Key: { gameId: requestBody.gameId },
+                        UpdateExpression: updateExpression
+                    }).promise();
+                    
+                    return success({ message: 'Move cancelled successfully' });
+                } catch (err) {
+                    console.error('Cancel move error:', err);
+                    return error('Failed to cancel move');
                 }
             }
             
@@ -320,6 +412,45 @@ exports.handler = async (event) => {
                         
                         const gameItem = game.Item;
                         const isPlayer1 = userId === gameItem.player1Id;
+                        
+                        // Check for timeout (1 minute)
+                        const gameAge = Date.now() - new Date(gameItem.createdAt).getTime();
+                        const TIMEOUT_MS = 1 * 60 * 1000; // 1 minute
+                        
+                        if (gameItem.status === 'active' && gameAge > TIMEOUT_MS) {
+                            // Game timed out
+                            await dynamodb.update({
+                                TableName: process.env.GAMES_TABLE,
+                                Key: { gameId },
+                                UpdateExpression: 'SET #status = :status, winner = :winner, completedAt = :completedAt',
+                                ExpressionAttributeNames: { '#status': 'status' },
+                                ExpressionAttributeValues: {
+                                    ':status': 'timeout',
+                                    ':winner': 'timeout',
+                                    ':completedAt': new Date().toISOString()
+                                }
+                            }).promise();
+                            
+                            // Clear game from both players
+                            const opponentId = isPlayer1 ? gameItem.player2Id : gameItem.player1Id;
+                            await Promise.all([
+                                dynamodb.update({
+                                    TableName: process.env.USERS_TABLE,
+                                    Key: { userId },
+                                    UpdateExpression: 'REMOVE currentGameId, waitingForMatch, waitingSince, matchedAt'
+                                }).promise(),
+                                dynamodb.update({
+                                    TableName: process.env.USERS_TABLE,
+                                    Key: { userId: opponentId },
+                                    UpdateExpression: 'REMOVE currentGameId, waitingForMatch, waitingSince, matchedAt'
+                                }).promise()
+                            ]);
+                            
+                            return success({
+                                timeout: true,
+                                message: 'Game was terminated due to time limit (1 minute)'
+                            });
+                        }
                         
                         // Update game with player's move
                         const updateExpression = isPlayer1 ? 

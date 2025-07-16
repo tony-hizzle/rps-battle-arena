@@ -185,7 +185,10 @@
                 <h2>🔍 Finding Player...</h2>
                 <p>Searching for an online opponent</p>
                 <div class="spinner"></div>
-                <button onclick="cancelSearch()">Cancel & Play Computer</button>
+                <div>
+                    <button onclick="cancelToMenu()">Cancel</button>
+                    <button class="primary-btn" onclick="playComputer()">Play Computer</button>
+                </div>
             </div>
 
             <div id="game-screen" class="hidden">
@@ -397,7 +400,11 @@
                     const data = await response.json();
                     
                     if (data.success) {
-                        if (data.data.gameComplete) {
+                        if (data.data.timeout) {
+                            // Game timed out
+                            alert(data.data.message || 'Game was terminated due to time limit (1 minute)');
+                            window.location.reload();
+                        } else if (data.data.gameComplete) {
                             // Game completed immediately (both moves made)
                             showResult(data.data);
                             currentGameId = null;
@@ -409,6 +416,7 @@
                                 <p>You played: ${getMoveEmoji(move)}</p>
                                 <p>Waiting for opponent...</p>
                                 <div class="spinner"></div>
+                                <button onclick="cancelMove()" style="margin-top: 1rem; background: #dc3545; color: white; padding: 0.8rem 1.5rem; border: none; border-radius: 10px; font-size: 1rem; cursor: pointer;">Change Move</button>
                             `;
                             
                             // Start checking for game completion
@@ -476,7 +484,7 @@
         }
 
         function showResult(gameResult) {
-            const { yourMove, opponentMove, result } = gameResult;
+            const { yourMove, opponentMove, result, opponent } = gameResult;
             
             document.getElementById('your-move').textContent = getMoveEmoji(yourMove);
             document.getElementById('opponent-move').textContent = getMoveEmoji(opponentMove);
@@ -499,6 +507,23 @@
             }
             
             gameStats.totalGames++;
+            
+            // Add rematch button for multiplayer games
+            const resultScreen = document.getElementById('result-screen');
+            const existingRematch = document.getElementById('rematch-btn');
+            if (existingRematch) existingRematch.remove();
+            
+            if (gameMode === 'multiplayer' && opponent && !opponent.startsWith('Computer_')) {
+                const rematchBtn = document.createElement('button');
+                rematchBtn.id = 'rematch-btn';
+                rematchBtn.className = 'primary-btn';
+                rematchBtn.textContent = '🔄 Rematch';
+                rematchBtn.onclick = () => requestRematch(opponent);
+                
+                const playAgainBtn = resultScreen.querySelector('button');
+                playAgainBtn.parentNode.insertBefore(rematchBtn, playAgainBtn);
+            }
+            
             showScreen('result-screen');
         }
 
@@ -541,11 +566,18 @@
                 
                 if (data.success) {
                     if (data.data.gameComplete) {
-                        // Game completed, show results
                         clearInterval(gameCheckInterval);
-                        showResult(data.data);
-                        currentGameId = null;
-                        await loadUserStats();
+                        
+                        if (data.data.timeout) {
+                            // Game timed out
+                            alert(data.data.message || 'Game was terminated due to time limit (1 minute)');
+                            window.location.reload();
+                        } else {
+                            // Game completed normally
+                            showResult(data.data);
+                            currentGameId = null;
+                            await loadUserStats();
+                        }
                     }
                 }
             } catch (error) {
@@ -704,14 +736,64 @@
             }
         }
         
-        function cancelSearch() {
+        function cancelToMenu() {
             if (searchTimeout) {
                 clearTimeout(searchTimeout);
                 searchTimeout = null;
             }
+            if (window.matchPolling) {
+                clearTimeout(window.matchPolling);
+                window.matchPolling = null;
+            }
+            showScreen('mode-screen');
+        }
+        
+        function playComputer() {
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+                searchTimeout = null;
+            }
+            if (window.matchPolling) {
+                clearTimeout(window.matchPolling);
+                window.matchPolling = null;
+            }
             gameMode = 'computer';
             document.getElementById('opponent-info').textContent = 'vs Computer';
             showScreen('game-screen');
+        }
+        
+        async function cancelMove() {
+            if (!currentGameId) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/game`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'cancel_move',
+                        gameId: currentGameId,
+                        userId: currentUser?.userId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Stop checking for game completion
+                    if (gameCheckInterval) {
+                        clearInterval(gameCheckInterval);
+                        gameCheckInterval = null;
+                    }
+                    
+                    // Return to game screen to make new move
+                    showScreen('game-screen');
+                } else {
+                    alert('Failed to cancel move: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Cancel move error:', error);
+                alert('Failed to cancel move. Please try again.');
+            }
         }
         
         function playAgain() {
@@ -786,18 +868,37 @@
         
         async function showLeaderboard() {
             try {
-                const response = await fetch(`${API_URL}/leaderboard`);
+                const url = currentUser?.userId ? `${API_URL}/leaderboard?userId=${currentUser.userId}` : `${API_URL}/leaderboard`;
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 const leaderboardDiv = document.getElementById('leaderboard-list');
                 
                 if (data.success) {
-                    leaderboardDiv.innerHTML = data.data.map(player => `
-                        <div class="stat" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    let html = '';
+                    const top10 = data.data.slice(0, 10);
+                    const userEntry = data.data.find(p => p.rank > 10);
+                    
+                    // Show top 10
+                    html += top10.map(player => `
+                        <div class="stat" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;${player.userId === currentUser?.userId ? ' background: #e3f2fd;' : ''}">
                             <span><strong>#${player.rank} ${player.username}</strong></span>
-                            <span>${player.wins} wins (${player.winRate}%)</span>
+                            <span>${player.wins || 0} wins (${player.winRate || 0}%)</span>
                         </div>
                     `).join('');
+                    
+                    // Add separator and user's rank if not in top 10
+                    if (userEntry) {
+                        html += '<div style="margin: 1rem 0; text-align: center; color: #666;">...</div>';
+                        html += `
+                            <div class="stat" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; background: #e3f2fd;">
+                                <span><strong>#${userEntry.rank} ${userEntry.username} (You)</strong></span>
+                                <span>${userEntry.wins || 0} wins (${userEntry.winRate || 0}%)</span>
+                            </div>
+                        `;
+                    }
+                    
+                    leaderboardDiv.innerHTML = html;
                 } else {
                     leaderboardDiv.innerHTML = '<p>Failed to load leaderboard</p>';
                 }

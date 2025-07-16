@@ -26,16 +26,34 @@ exports.handler = async (event) => {
             });
         }
         
-        if (httpMethod === 'GET' && path === '/leaderboard') {
-            // Get top 10 players by wins
+        if (httpMethod === 'GET' && path.startsWith('/leaderboard')) {
+            const userId = event.queryStringParameters?.userId;
+            
+            // Get all players sorted by wins
             const result = await dynamodb.scan({
                 TableName: process.env.USERS_TABLE,
                 ProjectionExpression: 'userId, username, wins, totalGames'
             }).promise();
             
-            const leaderboard = result.Items
+            const allPlayers = result.Items
+                .filter(player => (player.wins || 0) > 0 || (player.totalGames || 0) > 0)
                 .sort((a, b) => (b.wins || 0) - (a.wins || 0))
-                .slice(0, 10);
+                .map((player, index) => ({
+                    ...player,
+                    rank: index + 1,
+                    winRate: player.totalGames > 0 ? Math.round((player.wins || 0) / player.totalGames * 100) : 0
+                }));
+            
+            const top10 = allPlayers.slice(0, 10);
+            let leaderboard = [...top10];
+            
+            // If userId provided and not in top 10, add user's rank
+            if (userId) {
+                const userRank = allPlayers.find(player => player.userId === userId);
+                if (userRank && userRank.rank > 10) {
+                    leaderboard.push(userRank);
+                }
+            }
             
             return success(leaderboard);
         }
