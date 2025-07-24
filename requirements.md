@@ -17,6 +17,10 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 - [x] Win/loss tracking and statistics
 - [x] Game history and leaderboard
 - [x] Real-time game state synchronization
+- [x] Rematch system for continuous play
+- [x] Game timeouts (1-minute limit)
+- [x] Computer opponent mode
+- [x] Enhanced leaderboard with user ranking
 
 ### User Stories
 - As a player, I want to create an account so that my wins are tracked
@@ -24,6 +28,10 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 - As a player, I want to see my win/loss record so that I can track my performance
 - As a player, I want to see a leaderboard so that I can compare my performance with others
 - As a player, I want real-time gameplay so that the experience feels responsive and engaging
+- As a player, I want to rematch my opponent so that I can play multiple games quickly
+- As a player, I want games to timeout so that I'm not stuck waiting indefinitely
+- As a player, I want to play against computer when no humans are available
+- As a player, I want to see my rank even if I'm not in the top 10
 
 ## Non-Functional Requirements
 
@@ -104,6 +112,30 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 - **Efficient Database**: DynamoDB with optimized queries
 - **Serverless Scaling**: Lambda functions auto-scale with demand
 
+## Recent Enhancements (v2.0)
+
+### Rematch System
+- [x] Instant rematch between same players
+- [x] Smart game joining (second player joins existing rematch)
+- [x] Clean game state reset for new matches
+
+### Game Timeouts
+- [x] 1-minute timeout for active games
+- [x] Automatic cleanup of timed-out games
+- [x] Page reload after timeout for clean state
+
+### Enhanced UI/UX
+- [x] Separate Cancel/Play Computer buttons on waiting screen
+- [x] Safari compatibility fixes
+- [x] Improved error handling and user feedback
+- [x] Cross-browser compatibility (Chrome, Safari, Firefox)
+
+### Leaderboard Improvements
+- [x] Top 10 players display
+- [x] User rank shown even if outside top 10
+- [x] Win rate percentage calculations
+- [x] Highlighted user entries
+
 ## Out of Scope
 - Advanced matchmaking algorithms
 - Tournament brackets or advanced game modes
@@ -113,3 +145,4 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 - Payment or monetization features
 - WebSocket implementation (replaced with polling)
 - Advanced authentication (JWT, OAuth)
+- Move cancellation (removed for better UX)

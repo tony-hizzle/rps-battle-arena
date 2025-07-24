@@ -208,9 +208,11 @@
                     <p>You played: <span id="your-move"></span></p>
                     <p>Opponent played: <span id="opponent-move"></span></p>
                 </div>
-                <button class="primary-btn" onclick="playAgain()">Play Again</button>
-                <button onclick="showStats()">View Stats</button>
-                <button onclick="logout()" style="background: #dc3545; color: white;">Logout</button>
+                <div id="result-buttons">
+                    <button class="primary-btn" onclick="playAgain()">Play Again</button>
+                    <button onclick="showStats()">View Stats</button>
+                    <button onclick="logout()" style="background: #dc3545; color: white;">Logout</button>
+                </div>
             </div>
 
             <div id="stats-screen" class="hidden">
@@ -416,7 +418,6 @@
                                 <p>You played: ${getMoveEmoji(move)}</p>
                                 <p>Waiting for opponent...</p>
                                 <div class="spinner"></div>
-                                <button onclick="cancelMove()" style="margin-top: 1rem; background: #dc3545; color: white; padding: 0.8rem 1.5rem; border: none; border-radius: 10px; font-size: 1rem; cursor: pointer;">Change Move</button>
                             `;
                             
                             // Start checking for game completion
@@ -517,7 +518,7 @@
                 const rematchBtn = document.createElement('button');
                 rematchBtn.id = 'rematch-btn';
                 rematchBtn.className = 'primary-btn';
-                rematchBtn.textContent = '🔄 Rematch';
+                rematchBtn.textContent = 'Rematch';
                 rematchBtn.onclick = () => requestRematch(opponent);
                 
                 const playAgainBtn = resultScreen.querySelector('button');
@@ -762,37 +763,45 @@
             showScreen('game-screen');
         }
         
-        async function cancelMove() {
-            if (!currentGameId) return;
-            
+
+        
+        async function requestRematch(opponent) {
             try {
                 const response = await fetch(`${API_URL}/game`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        action: 'cancel_move',
-                        gameId: currentGameId,
-                        userId: currentUser?.userId
+                        action: 'request_rematch',
+                        userId: currentUser?.userId,
+                        username: currentUser?.username,
+                        opponent: opponent
                     })
                 });
                 
                 const data = await response.json();
                 
-                if (data.success) {
-                    // Stop checking for game completion
-                    if (gameCheckInterval) {
-                        clearInterval(gameCheckInterval);
-                        gameCheckInterval = null;
-                    }
+                if (data.success && data.data.gameId) {
+                    currentGameId = data.data.gameId;
                     
-                    // Return to game screen to make new move
+                    // Reset game screen to fresh state
+                    document.getElementById('game-screen').innerHTML = `
+                        <h2>Make Your Move!</h2>
+                        <p>Playing as: <span id="player-name">${currentUser?.username || 'Player'}</span></p>
+                        <p id="opponent-info">vs ${opponent}</p>
+                        <div>
+                            <button class="move-btn" onclick="makeMove('rock')">🪨 Rock</button>
+                            <button class="move-btn" onclick="makeMove('paper')">📄 Paper</button>
+                            <button class="move-btn" onclick="makeMove('scissors')">✂️ Scissors</button>
+                        </div>
+                    `;
+                    
                     showScreen('game-screen');
                 } else {
-                    alert('Failed to cancel move: ' + data.error);
+                    alert('Failed to start rematch: ' + (data.error || 'Opponent may not be available'));
                 }
             } catch (error) {
-                console.error('Cancel move error:', error);
-                alert('Failed to cancel move. Please try again.');
+                console.error('Rematch error:', error);
+                alert('Failed to start rematch. Please try again.');
             }
         }
         

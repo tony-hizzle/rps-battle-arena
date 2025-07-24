@@ -2,66 +2,193 @@
 
 This is the README file for **RPS Battle Arena**, a multiplayer Rock, Paper, Scissors web application built as part of the "Disney Hack the Code Challenge", a mini hack-a-thon for building applications using Amazon Q Developer IDE experience. The project, including the files below, will be implemented by the Amazon Q Developer, through interactive discussion with the user.
 
-## Use case
+## 🎯 Use Case
 
-RPS Battle Arena provides an engaging multiplayer gaming experience where users can play the classic Rock, Paper, Scissors game against other online players in real-time. The application solves the problem of finding opponents for this simple yet entertaining game, while adding competitive elements through win tracking and leaderboards. This creates a fun, accessible gaming platform that brings people together for quick, casual gameplay sessions.
+RPS Battle Arena transforms the classic Rock, Paper, Scissors game into a competitive online experience. Players can:
 
-## Value proposition
+- **Find Opponents Instantly**: Automatic matchmaking connects you with online players
+- **Track Performance**: Detailed statistics and leaderboard rankings
+- **Challenge Friends**: Rematch system for continuous play
+- **Play Anytime**: Computer opponents available when no players online
+- **Compete Globally**: Real-time multiplayer with players worldwide
 
-RPS Battle Arena delivers instant entertainment value through:
-- **Real-time multiplayer gameplay** - No waiting for turns, immediate game resolution
-- **Competitive tracking** - Personal statistics and leaderboards motivate continued play
-- **Zero setup required** - Browser-based gameplay with simple authentication
-- **Scalable architecture** - Built on AWS serverless technology for reliable performance
-- **Cost-effective solution** - Demonstrates how to build engaging multiplayer experiences using AWS native services efficiently
+Perfect for quick gaming sessions, competitive tournaments, or casual fun with friends.
 
-## Development approach
+## 💎 Value Proposition
 
-When working with this project, the agent should ensure it is working within a git repo. If one is not configured yet, the agent should create one.
+### For Players
+- **Instant Fun**: No downloads, play immediately in browser
+- **Fair Competition**: Server-side validation prevents cheating
+- **Progress Tracking**: Watch your skills improve over time
+- **Social Gaming**: Connect with players worldwide
+- **Always Available**: Computer opponents when humans aren't online
 
-The agent should update and extend this README.md file with additional information about the project as development progresses, and commit changes to this file and the other planning files below as they are updated.
+### For Developers
+- **Serverless Architecture**: Scales automatically, pay only for usage
+- **Modern Stack**: Latest AWS services and best practices
+- **Real-time Features**: WebSocket-like experience with polling
+- **Production Ready**: Error handling, timeouts, and edge cases covered
+- **Cost Efficient**: Minimal infrastructure costs for maximum functionality
 
-Working with the user, the agent will implement the project step by step, first by working out the requirements, then the design/architecture including AWS infrastructure components, then the list of tasks needed to: 1) implement the project source code and any AWS infrastructure required, 2) steps to deploy the application and infrastructure components, 3) run any integration tests against the deployed project.
+## 🔄 Recent Updates
 
-Once all planning steps are completed and documented, and the user is ready to proceed, the agent will begin implementing the tasks one at a time until the project is completed.
+### Latest Features (v2.0)
+- ✅ **Rematch System**: Instant rematches between same players
+- ✅ **Game Timeouts**: 1-minute timeout with automatic cleanup
+- ✅ **Enhanced Leaderboard**: Shows user rank even outside top 10
+- ✅ **Improved UI**: Separate Cancel/Play Computer buttons
+- ✅ **Safari Compatibility**: Fixed cross-browser issues
+- ✅ **Smart Matchmaking**: Join existing rematch games
+
+### Bug Fixes
+- 🐛 Fixed Safari null reference errors
+- 🐛 Resolved game screen state persistence
+- 🐛 Improved DynamoDB query performance
+- 🐛 Enhanced error handling and user feedback
+
+### Performance Improvements
+- ⚡ Optimized matchmaking polling
+- ⚡ Reduced API calls with smart caching
+- ⚡ Faster game state transitions
+- ⚡ Improved timeout handling
 
 ## 🚀 Live Application
 
-**🎮 Play Now**: http://rps-battle-arena-web-1752194117.s3-website-us-east-1.amazonaws.com/rps-battle-arena.html
+**🎮 Play Now**: http://rps-battle-arena-web-1752251316.s3-website-us-east-1.amazonaws.com/
 **API URL**: https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod/
 
-**Alternative**: Open `rps-battle-arena.html` locally in your browser
+## ✨ Features
+
+### 🎮 Game Modes
+- **Multiplayer**: Real-time matches against online players
+- **Computer**: Play against AI opponents
+- **Rematch**: Challenge previous opponents instantly
+
+### 🏆 Competitive Features
+- **Leaderboard**: Top 10 players + your rank if outside top 10
+- **Personal Stats**: Track wins, losses, draws, and total games
+- **Game History**: Review your recent matches
+- **Win Rate Tracking**: Percentage-based performance metrics
+
+### ⚡ Real-time Gameplay
+- **1-minute game timeout** for active multiplayer games
+- **Instant matchmaking** with waiting queue system
+- **Live game status** updates and notifications
+- **Automatic timeout handling** with page refresh
+
+### 🔧 User Experience
+- **User Authentication**: Login/Register system
+- **Persistent Sessions**: Stay logged in across visits
+- **Responsive Design**: Works on desktop and mobile
+- **Cross-browser Support**: Chrome, Safari, Firefox compatible
 
 ### API Endpoints
-- `POST /auth` - User authentication
-- `GET /leaderboard` - Top players leaderboard  
+- `POST /auth` - User login/registration
+- `GET /leaderboard?userId={id}` - Leaderboard with user rank
 - `GET /stats/{userId}` - User statistics
-- `POST /game` - Play Rock Paper Scissors
+- `POST /game` - Game actions (play, find_match, request_rematch)
+- `GET /games/{userId}` - User game history
 
 ### Test the API
 ```bash
 # Get leaderboard
 curl "https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod/leaderboard"
 
-# Play a game
+# Play against computer
 curl -X POST "https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod/game" \
   -H "Content-Type: application/json" \
-  -d '{"action":"play","move":"rock"}'
+  -d '{"action":"play","move":"rock","gameMode":"computer"}'
 ```
 
-## Project layout 
+## 📁 Project Structure
 
-* requirements.md: Defines the requirements for this project
-* design.md: Defines the design and architecture for this project
-* tasks.md: Lists the discrete tasks that need to be executed in order to successfully implement the project
-* infrastructure/: AWS CDK Java project for infrastructure deployment
-* src/: Lambda function source code (Node.js)
-* frontend/: Web application (HTML/CSS/JavaScript)
+```
+rps-battle-arena/
+├── README.md                 # Project documentation
+├── requirements.md           # Project requirements
+├── design.md                # Architecture design
+├── tasks.md                 # Implementation tasks
+├── frontend/                # Web application
+│   ├── index.html          # Main application file
+│   ├── css/style.css       # Styling
+│   └── js/app.js           # JavaScript logic
+├── src/                     # Lambda functions
+│   ├── index.js            # Main handler
+│   ├── handlers/           # Route handlers
+│   ├── utils/              # Utility functions
+│   └── shared/             # Shared modules
+└── infrastructure/          # AWS CDK project
+    ├── src/main/java/      # CDK stack definition
+    └── cdk.json            # CDK configuration
+```
 
-## Deployment Architecture
+## 🚀 Deployment
 
-- **Frontend**: S3 Static Website Hosting
-- **Backend**: AWS Lambda + API Gateway
-- **Database**: Amazon DynamoDB
-- **Infrastructure**: AWS CDK (Java)
+### Prerequisites
+- AWS CLI configured
+- Node.js 18+ installed
+- Java 11+ for CDK
+- Maven for CDK build
+
+### Deploy Backend
+```bash
+cd infrastructure
+npx cdk deploy --require-approval never
+```
+
+### Deploy Frontend
+```bash
+aws s3 sync frontend/ s3://your-bucket-name/ --delete
+```
+
+### Local Development
+```bash
+# Install dependencies
+cd src && npm install
+
+# Test locally
+open frontend/index.html
+```
+
+## 🏗️ Architecture
+
+### Frontend
+- **Hosting**: Amazon S3 Static Website
+- **Technology**: Vanilla HTML/CSS/JavaScript
+- **Features**: Real-time UI updates, responsive design
+
+### Backend
+- **Compute**: AWS Lambda (Node.js 18.x)
+- **API**: Amazon API Gateway REST API
+- **Authentication**: Custom user system
+- **Game Logic**: Server-side move validation
+
+### Database
+- **Primary**: Amazon DynamoDB
+- **Tables**: Users, Games, Connections
+- **Features**: Pay-per-request billing, automatic scaling
+
+### Infrastructure
+- **IaC**: AWS CDK (Java)
+- **Deployment**: Automated via CDK
+- **Monitoring**: CloudWatch logs and metrics
+
+## 🎯 Game Rules
+
+### Multiplayer Games
+- **Matchmaking**: Automatic pairing with waiting players
+- **Timeout**: Games expire after 1 minute of inactivity
+- **Rematch**: Instant rematches with same opponent
+- **Stats**: All multiplayer results tracked
+
+### Computer Games
+- **AI Opponent**: Random move generation
+- **Instant Results**: No waiting for opponent
+- **Stats Tracking**: Wins/losses recorded
+
+### Scoring
+- **Win**: Your move beats opponent's move
+- **Loss**: Opponent's move beats your move  
+- **Draw**: Both players choose same move
+- **Classic Rules**: Rock beats Scissors, Scissors beats Paper, Paper beats Rock
 

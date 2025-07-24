@@ -342,50 +342,105 @@ exports.handler = async (event) => {
                 }
             }
             
-            if (action === 'cancel_move') {
+            if (action === 'request_rematch') {
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
                 
                 try {
-                    const game = await dynamodb.get({
-                        TableName: process.env.GAMES_TABLE,
-                        Key: { gameId: requestBody.gameId }
+                    // Find opponent's userId by username
+                    const opponentResult = await dynamodb.scan({
+                        TableName: process.env.USERS_TABLE,
+                        FilterExpression: 'username = :username',
+                        ExpressionAttributeValues: { ':username': requestBody.opponent }
                     }).promise();
                     
-                    if (!game.Item) {
-                        return error('Game not found');
+                    if (opponentResult.Items.length === 0) {
+                        return error('Opponent not found');
                     }
                     
-                    const gameItem = game.Item;
-                    const isPlayer1 = userId === gameItem.player1Id;
+                    const opponentId = opponentResult.Items[0].userId;
                     
-                    // Check if game is still active
-                    if (gameItem.status !== 'active') {
-                        return error('Game is no longer active');
-                    }
-                    
-                    // Check if both moves are already made
-                    if (gameItem.player1Move && gameItem.player2Move) {
-                        return error('Cannot cancel move - game already completed');
-                    }
-                    
-                    // Remove the player's move
-                    const updateExpression = isPlayer1 ? 
-                        'REMOVE player1Move' : 
-                        'REMOVE player2Move';
-                    
-                    await dynamodb.update({
+                    // Check if there's already an active rematch game between these players
+                    const existingGames = await dynamodb.scan({
                         TableName: process.env.GAMES_TABLE,
-                        Key: { gameId: requestBody.gameId },
-                        UpdateExpression: updateExpression
+                        FilterExpression: '#status = :status AND begins_with(gameId, :rematchPrefix)',
+                        ExpressionAttributeNames: { '#status': 'status' },
+                        ExpressionAttributeValues: {
+                            ':status': 'active',
+                            ':rematchPrefix': 'rematch_'
+                        }
                     }).promise();
                     
-                    return success({ message: 'Move cancelled successfully' });
+                    // Filter for games between these specific players
+                    const playerGames = existingGames.Items.filter(game => 
+                        (game.player1Id === userId && game.player2Id === opponentId) ||
+                        (game.player1Id === opponentId && game.player2Id === userId)
+                    );
+                    
+                    if (playerGames.length > 0) {
+                        // Join existing rematch game
+                        const existingGame = playerGames[0];
+                        
+                        // Update both players' current game
+                        await Promise.all([
+                            dynamodb.update({
+                                TableName: process.env.USERS_TABLE,
+                                Key: { userId },
+                                UpdateExpression: 'SET currentGameId = :gameId',
+                                ExpressionAttributeValues: { ':gameId': existingGame.gameId }
+                            }).promise(),
+                            dynamodb.update({
+                                TableName: process.env.USERS_TABLE,
+                                Key: { userId: opponentId },
+                                UpdateExpression: 'SET currentGameId = :gameId',
+                                ExpressionAttributeValues: { ':gameId': existingGame.gameId }
+                            }).promise()
+                        ]);
+                        
+                        return success({ gameId: existingGame.gameId, message: 'Joined rematch!' });
+                    } else {
+                        // Create new rematch game
+                        const gameId = 'rematch_' + Date.now();
+                        
+                        await dynamodb.put({
+                            TableName: process.env.GAMES_TABLE,
+                            Item: {
+                                gameId,
+                                player1Id: userId,
+                                player2Id: opponentId,
+                                player1Name: requestBody.username,
+                                player2Name: requestBody.opponent,
+                                status: 'active',
+                                createdAt: new Date().toISOString(),
+                                timestamp: new Date().toISOString()
+                            }
+                        }).promise();
+                        
+                        // Update both players' current game
+                        await Promise.all([
+                            dynamodb.update({
+                                TableName: process.env.USERS_TABLE,
+                                Key: { userId },
+                                UpdateExpression: 'SET currentGameId = :gameId',
+                                ExpressionAttributeValues: { ':gameId': gameId }
+                            }).promise(),
+                            dynamodb.update({
+                                TableName: process.env.USERS_TABLE,
+                                Key: { userId: opponentId },
+                                UpdateExpression: 'SET currentGameId = :gameId',
+                                ExpressionAttributeValues: { ':gameId': gameId }
+                            }).promise()
+                        ]);
+                        
+                        return success({ gameId, message: 'Rematch started!' });
+                    }
                 } catch (err) {
-                    console.error('Cancel move error:', err);
-                    return error('Failed to cancel move');
+                    console.error('Rematch error:', err);
+                    return error('Failed to start rematch');
                 }
             }
+            
+
             
             if (action === 'play') {
                 if (!isValidMove(move)) {

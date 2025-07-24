@@ -58,15 +58,15 @@ Attributes:
 Table: rps-games
 Partition Key: gameId (String)
 Attributes:
-- gameId: String (UUID)
+- gameId: String (UUID or rematch_timestamp)
 - player1Id: String
 - player2Id: String
 - player1Name: String
 - player2Name: String
 - player1Move: String (rock/paper/scissors)
 - player2Move: String (rock/paper/scissors)
-- winner: String (player1Id/player2Id/draw)
-- status: String (active/completed)
+- winner: String (player1Id/player2Id/draw/timeout)
+- status: String (active/completed/timeout)
 - gameMode: String (computer/multiplayer)
 - createdAt: String (ISO timestamp)
 - completedAt: String (ISO timestamp)
@@ -93,13 +93,13 @@ Attributes:
 
 #### Authentication
 - `POST /auth` - User registration and login
-  - Actions: `register`, `login`, `verify_phone`, `verify_login`, `resend_code`
+  - Actions: `register`, `login`
 
 #### Game Management
 - `POST /game` - All game operations
-  - Actions: `find_match`, `play`, `check_game`
+  - Actions: `find_match`, `play`, `check_game`, `request_rematch`
 - `GET /stats/{userId}` - Get user statistics
-- `GET /leaderboard` - Get top players
+- `GET /leaderboard?userId={id}` - Get top players with user rank
 - `GET /games/{userId}` - Get user's game history
 
 ### Real-time Communication (Polling)
@@ -338,6 +338,30 @@ function playAgain() {
 ### Security Notes
 - Input validation is implemented but should be regularly reviewed
 - Rate limiting may be needed for production deployment
+
+## Current Features (v2.0)
+
+### Rematch System
+- **Smart Rematch Logic**: First player creates rematch game, second player joins existing game
+- **Game State Reset**: Fresh "Make Your Move" interface for both players
+- **Cross-browser Compatibility**: Works in Chrome, Safari, Firefox
+
+### Game Timeouts
+- **1-minute Timeout**: Active games automatically timeout after 1 minute
+- **Automatic Cleanup**: Timed-out games marked as 'timeout' status
+- **Page Reload**: Clean state restoration after timeout
+
+### Enhanced Leaderboard
+- **Top 10 Display**: Shows top 10 players by wins
+- **User Ranking**: Shows user's rank even if outside top 10
+- **Win Rate Calculation**: Displays win percentage for each player
+- **Highlighted Entries**: User's own entry highlighted in blue
+
+### Improved UI/UX
+- **Separate Buttons**: Cancel and Play Computer buttons on waiting screen
+- **Safari Fixes**: Null reference error handling for Safari
+- **Game Screen Reset**: Proper state management for rematch games
+- **Error Handling**: Better user feedback for all error conditions
 
 ## Future Enhancements
 
