@@ -984,6 +984,20 @@
                 clearTimeout(window.matchPolling);
                 window.matchPolling = null;
             }
+            if (window.matchTimeout) {
+                clearTimeout(window.matchTimeout);
+                window.matchTimeout = null;
+            }
+            
+            // Set 10-minute timeout
+            window.matchTimeout = setTimeout(() => {
+                if (window.matchPolling) {
+                    clearTimeout(window.matchPolling);
+                    window.matchPolling = null;
+                }
+                alert('No online players found after 10 minutes. Returning to game mode selection.');
+                showScreen('mode-screen');
+            }, 10 * 60 * 1000); // 10 minutes
             
             const checkForMatch = async () => {
                 try {
@@ -1010,6 +1024,16 @@
                         currentGameId = data.data.gameId;
                         document.getElementById('opponent-info').textContent = 'vs ' + data.data.opponent;
                         
+                        // Clear timeouts
+                        if (window.matchPolling) {
+                            clearTimeout(window.matchPolling);
+                            window.matchPolling = null;
+                        }
+                        if (window.matchTimeout) {
+                            clearTimeout(window.matchTimeout);
+                            window.matchTimeout = null;
+                        }
+                        
                         // Direct approach for Chrome compatibility
                         playSound('bell');
                         showScreen('game-screen');
@@ -1022,11 +1046,6 @@
                             }
                         }, 200);
                         
-                        // Clear polling immediately
-                        if (window.matchPolling) {
-                            clearTimeout(window.matchPolling);
-                            window.matchPolling = null;
-                        }
                         return; // Stop checking once match is found
                     } else {
                         console.log('No match yet, continuing to poll...');
@@ -1083,6 +1102,10 @@
                 clearTimeout(window.matchPolling);
                 window.matchPolling = null;
             }
+            if (window.matchTimeout) {
+                clearTimeout(window.matchTimeout);
+                window.matchTimeout = null;
+            }
             showScreen('mode-screen');
         }
         
@@ -1094,6 +1117,10 @@
             if (window.matchPolling) {
                 clearTimeout(window.matchPolling);
                 window.matchPolling = null;
+            }
+            if (window.matchTimeout) {
+                clearTimeout(window.matchTimeout);
+                window.matchTimeout = null;
             }
             gameMode = 'computer';
             document.getElementById('opponent-info').textContent = 'vs Computer';
@@ -1149,13 +1176,8 @@
                 document.getElementById('opponent-info').textContent = 'vs Computer';
                 showScreen('game-screen');
             } else {
-                // For authenticated users, force page reload for repeat matchmaking to ensure clean state
-                if (gameStats.totalGames > 0) {
-                    console.log('Reloading page for clean repeat matchmaking state');
-                    window.location.reload();
-                } else {
-                    showScreen('mode-screen');
-                }
+                // For authenticated users, go directly to mode screen instead of reloading
+                showScreen('mode-screen');
             }
         }
 
