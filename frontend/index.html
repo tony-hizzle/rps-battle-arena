@@ -154,17 +154,40 @@
         <div class="card">
             <div id="login-screen">
                 <h2>Join the Battle!</h2>
-                <div id="login-form">
-                    <input type="text" id="login-username" placeholder="Enter username" required>
-                    <input type="email" id="login-email" placeholder="Enter email address" required>
-                    <button class="primary-btn" onclick="loginUser()">Login</button>
-                    <button onclick="showRegister()">Register</button>
+                <div id="auth-options">
+                    <p>Sign in to track your wins and compete on the leaderboard!</p>
+                    <div style="margin: 2rem 0;">
+                        <button class="primary-btn" onclick="showEmailLogin()" style="margin: 0.5rem;">
+                            📧 Sign In
+                        </button>
+                        <button class="primary-btn" onclick="showEmailRegister()" style="margin: 0.5rem;">
+                            🆕 Create Account
+                        </button>
+                    </div>
+                    <button onclick="playAsGuest()" style="background: #6c757d; color: white; padding: 0.8rem 1.5rem; border: none; border-radius: 10px; font-size: 0.9rem; cursor: pointer; margin: 0.5rem;">
+                        Play as Guest
+                    </button>
                 </div>
-                <div id="register-form" class="hidden">
-                    <input type="text" id="reg-username" placeholder="Choose username" required>
+                <div id="email-login-form" class="hidden">
+                    <input type="email" id="login-email" placeholder="Enter email address" required>
+                    <input type="password" id="login-password" placeholder="Enter password" required>
+                    <button class="primary-btn" onclick="signInWithEmail()">Sign In</button>
+                    <button onclick="showAuthOptions()">Back</button>
+                </div>
+                <div id="email-register-form" class="hidden">
                     <input type="email" id="reg-email" placeholder="Enter email address" required>
-                    <button class="primary-btn" onclick="registerUser()">Register</button>
-                    <button onclick="showLogin()">Back to Login</button>
+                    <input type="password" id="reg-password" placeholder="Choose password (min 8 characters)" required>
+                    <input type="text" id="reg-username" placeholder="Choose display name" required>
+                    <button class="primary-btn" onclick="signUpWithEmail()">Create Account</button>
+                    <button onclick="showAuthOptions()">Back</button>
+                </div>
+                <div id="email-verify-form" class="hidden">
+                    <h3>Verify Your Email</h3>
+                    <p>Please enter the verification code sent to your email address.</p>
+                    <input type="text" id="verify-code" placeholder="Enter verification code" required maxlength="6">
+                    <button class="primary-btn" onclick="verifyEmail()">Verify</button>
+                    <button onclick="resendVerificationCode()">Resend Code</button>
+                    <button onclick="showAuthOptions()">Back</button>
                 </div>
             </div>
 
@@ -255,30 +278,48 @@
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
     <script>
         const API_URL = 'https://19qwltuxoi.execute-api.us-east-1.amazonaws.com/prod';
+        
+        // Cognito Configuration
+        const COGNITO_CONFIG = {
+            userPoolId: 'us-east-1_Zfn7ed9qT',
+            clientId: '58f0vvfskgti5qnnr79u9uod7b',
+            identityPoolId: 'us-east-1:9b21c277-46ba-4d03-a1d6-098e9ca099f1',
+            region: 'us-east-1'
+        };
+        
         let currentUser = null;
         let gameStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
         let gameMode = 'computer';
         let searchTimeout = null;
         let currentGameId = null;
         let gameCheckInterval = null;
+        let cognitoUser = null;
         
         // Check for saved login on page load
         window.addEventListener('load', function() {
             const savedUser = localStorage.getItem('rpsUser');
+            const savedTokens = localStorage.getItem('cognitoTokens');
+            
             if (savedUser) {
                 try {
                     currentUser = JSON.parse(savedUser);
                     document.getElementById('player-name').textContent = currentUser.username;
                     document.getElementById('player-name-mode').textContent = currentUser.username;
                     showScreen('mode-screen');
-                    loadUserStats();
+                    if (!currentUser.isGuest) {
+                        loadUserStats();
+                    }
                 } catch (error) {
                     localStorage.removeItem('rpsUser');
+                    localStorage.removeItem('cognitoTokens');
+                    showAuthOptions();
                     showScreen('login-screen');
                 }
             } else {
+                showAuthOptions();
                 showScreen('login-screen');
             }
         });
@@ -298,88 +339,299 @@
             }
         }
 
-        function showRegister(prefillUsername = '') {
-            if (prefillUsername) {
-                document.getElementById('reg-username').value = prefillUsername;
-            }
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('register-form').classList.remove('hidden');
+        function showAuthOptions() {
+            document.getElementById('auth-options').classList.remove('hidden');
+            document.getElementById('email-login-form').classList.add('hidden');
+            document.getElementById('email-register-form').classList.add('hidden');
+            document.getElementById('email-verify-form').classList.add('hidden');
         }
         
-        function showLogin() {
-            document.getElementById('register-form').classList.add('hidden');
-            document.getElementById('login-form').classList.remove('hidden');
+        function showEmailLogin() {
+            document.getElementById('auth-options').classList.add('hidden');
+            document.getElementById('email-login-form').classList.remove('hidden');
+            document.getElementById('email-register-form').classList.add('hidden');
+            document.getElementById('email-verify-form').classList.add('hidden');
         }
         
-        async function loginUser() {
-            const username = document.getElementById('login-username').value.trim();
-            const email = document.getElementById('login-email').value.trim();
+        function showEmailRegister() {
+            document.getElementById('auth-options').classList.add('hidden');
+            document.getElementById('email-login-form').classList.add('hidden');
+            document.getElementById('email-register-form').classList.remove('hidden');
+            document.getElementById('email-verify-form').classList.add('hidden');
+        }
+        
+        function showEmailVerify() {
+            document.getElementById('auth-options').classList.add('hidden');
+            document.getElementById('email-login-form').classList.add('hidden');
+            document.getElementById('email-register-form').classList.add('hidden');
+            document.getElementById('email-verify-form').classList.remove('hidden');
+        }
+        
+        function playAsGuest() {
+            currentUser = {
+                userId: 'guest_' + Date.now(),
+                username: 'Guest Player',
+                email: null,
+                isGuest: true
+            };
+            document.getElementById('player-name').textContent = currentUser.username;
+            document.getElementById('player-name-mode').textContent = currentUser.username;
+            showScreen('mode-screen');
+        }
+        
+        async function verifyEmail() {
+            const verificationCode = document.getElementById('verify-code').value.trim();
             
-            if (!username || !email) {
-                alert('Please enter both username and email');
+            if (!verificationCode) {
+                alert('Please enter the verification code');
+                return;
+            }
+            
+            if (!window.pendingUser) {
+                alert('No pending verification. Please sign up again.');
+                showEmailRegister();
                 return;
             }
             
             try {
-                const response = await fetch(`${API_URL}/auth`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'login', username, email })
+                const userPool = new AmazonCognitoIdentity.CognitoUserPool({
+                    UserPoolId: COGNITO_CONFIG.userPoolId,
+                    ClientId: COGNITO_CONFIG.clientId
                 });
                 
-                const data = await response.json();
+                const userData = {
+                    Username: window.pendingUser.username,
+                    Pool: userPool
+                };
                 
-                if (data.success) {
-                    currentUser = data.data.user;
-                    localStorage.setItem('rpsUser', JSON.stringify(currentUser));
-                    document.getElementById('player-name').textContent = currentUser.username;
-                    document.getElementById('player-name-mode').textContent = currentUser.username;
-                    showScreen('mode-screen');
-                    await loadUserStats();
-                } else {
-                    if (data.error === 'Username not found') {
-                        if (confirm('Username not found. Would you like to register?')) {
-                            showRegister(username);
-                        }
-                    } else {
-                        alert('Login failed: ' + data.error);
+                const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+                
+                cognitoUser.confirmRegistration(verificationCode, true, (err, result) => {
+                    if (err) {
+                        console.error('Verification failed:', err);
+                        alert('Verification failed: ' + err.message);
+                        return;
                     }
-                }
+                    
+                    alert('Email verified successfully! You can now sign in with your email.');
+                    // Pre-fill the email in login form
+                    document.getElementById('login-email').value = window.pendingUser.email || window.pendingUser.username;
+                    window.pendingUser = null;
+                    showEmailLogin();
+                });
             } catch (error) {
-                alert('Login failed. Please try again.');
+                console.error('Verification error:', error);
+                alert('Verification failed. Please try again.');
             }
         }
         
-        async function registerUser() {
-            const username = document.getElementById('reg-username').value.trim();
-            const email = document.getElementById('reg-email').value.trim();
+        async function resendVerificationCode() {
+            if (!window.pendingUser) {
+                alert('No pending verification. Please sign up again.');
+                showEmailRegister();
+                return;
+            }
             
-            if (!username || !email) {
+            try {
+                const userPool = new AmazonCognitoIdentity.CognitoUserPool({
+                    UserPoolId: COGNITO_CONFIG.userPoolId,
+                    ClientId: COGNITO_CONFIG.clientId
+                });
+                
+                const userData = {
+                    Username: window.pendingUser.username,
+                    Pool: userPool
+                };
+                
+                const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+                
+                cognitoUser.resendConfirmationCode((err, result) => {
+                    if (err) {
+                        console.error('Resend failed:', err);
+                        alert('Failed to resend code: ' + err.message);
+                        return;
+                    }
+                    
+                    alert('Verification code resent! Please check your email.');
+                });
+            } catch (error) {
+                console.error('Resend error:', error);
+                alert('Failed to resend code. Please try again.');
+            }
+        }
+        
+        async function signInWithEmail() {
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+            
+            if (!email || !password) {
+                alert('Please enter both email and password');
+                return;
+            }
+            
+            try {
+                const authenticationData = {
+                    Username: email,
+                    Password: password
+                };
+                
+                const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails(authenticationData);
+                const userPool = new AmazonCognitoIdentity.CognitoUserPool({
+                    UserPoolId: COGNITO_CONFIG.userPoolId,
+                    ClientId: COGNITO_CONFIG.clientId
+                });
+                
+                const userData = {
+                    Username: email,
+                    Pool: userPool
+                };
+                
+                const cognitoUserInstance = new AmazonCognitoIdentity.CognitoUser(userData);
+                cognitoUser = cognitoUserInstance;
+                
+                cognitoUserInstance.authenticateUser(authenticationDetails, {
+                    onSuccess: async (result) => {
+                        console.log('Cognito authentication successful');
+                        await handleCognitoSuccess(result);
+                    },
+                    onFailure: (err) => {
+                        console.error('Sign-in failed:', err);
+                        if (err.code === 'UserNotConfirmedException') {
+                            alert('Please verify your email address first. Check your email for the verification code.');
+                            // Store user info for verification
+                            window.pendingUser = {
+                                username: email, // Use email as username for verification
+                                email: email
+                            };
+                            showEmailVerify();
+                        } else if (err.code === 'NotAuthorizedException') {
+                            alert('Invalid email or password. Please try again.');
+                        } else {
+                            alert('Sign-in failed: ' + err.message);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Sign-in error:', error);
+                alert('Sign-in failed. Please try again.');
+            }
+        }
+        
+        async function signUpWithEmail() {
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-password').value.trim();
+            const displayName = document.getElementById('reg-username').value.trim();
+            
+            if (!email || !password || !displayName) {
                 alert('Please fill in all fields');
                 return;
             }
             
+            if (password.length < 8) {
+                alert('Password must be at least 8 characters long');
+                return;
+            }
+            
+            try {
+                const userPool = new AmazonCognitoIdentity.CognitoUserPool({
+                    UserPoolId: COGNITO_CONFIG.userPoolId,
+                    ClientId: COGNITO_CONFIG.clientId
+                });
+                
+                // Generate unique username (not email format)
+                const uniqueUsername = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                
+                const attributeList = [
+                    new AmazonCognitoIdentity.CognitoUserAttribute({
+                        Name: 'email',
+                        Value: email
+                    }),
+                    new AmazonCognitoIdentity.CognitoUserAttribute({
+                        Name: 'preferred_username',
+                        Value: displayName
+                    })
+                ];
+                
+                userPool.signUp(uniqueUsername, password, attributeList, null, (err, result) => {
+                    if (err) {
+                        console.error('Sign-up failed:', err);
+                        alert('Sign-up failed: ' + err.message);
+                        return;
+                    }
+                    
+                    // Store user info for verification
+                    window.pendingUser = {
+                        username: uniqueUsername,
+                        email: email,
+                        displayName: displayName
+                    };
+                    
+                    alert('Account created! Please check your email for verification code.');
+                    showEmailVerify();
+                });
+            } catch (error) {
+                console.error('Sign-up error:', error);
+                alert('Sign-up failed. Please try again.');
+            }
+        }
+        
+        async function handleCognitoSuccess(result) {
+            try {
+                console.log('Cognito authentication successful');
+                const accessToken = result.getAccessToken().getJwtToken();
+                const idToken = result.getIdToken().getJwtToken();
+                const payload = result.getIdToken().payload;
+                
+                // Extract user info from ID token
+                const cognitoUserId = payload.sub;
+                const email = payload.email;
+                const preferredUsername = payload.preferred_username || payload.email;
+                
+                console.log('User info:', { cognitoUserId, email, preferredUsername });
+                
+                // Create user object
+                currentUser = {
+                    userId: cognitoUserId,
+                    username: preferredUsername,
+                    email: email
+                };
+                
+                // Store tokens and user info
+                localStorage.setItem('rpsUser', JSON.stringify(currentUser));
+                localStorage.setItem('cognitoTokens', JSON.stringify({ accessToken, idToken }));
+                
+                // Update UI
+                document.getElementById('player-name').textContent = currentUser.username;
+                document.getElementById('player-name-mode').textContent = currentUser.username;
+                showScreen('mode-screen');
+                
+                // Create user in backend if needed
+                await createUserInBackend(currentUser);
+                await loadUserStats();
+            } catch (error) {
+                console.error('Authentication error details:', error);
+                alert('Authentication failed: ' + error.message);
+            }
+        }
+        
+        async function createUserInBackend(user) {
             try {
                 const response = await fetch(`${API_URL}/auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'register', username, email })
+                    body: JSON.stringify({ 
+                        action: 'create_user', 
+                        userId: user.userId,
+                        username: user.username,
+                        email: user.email
+                    })
                 });
                 
                 const data = await response.json();
-                
-                if (data.success) {
-                    currentUser = data.data.user;
-                    localStorage.setItem('rpsUser', JSON.stringify(currentUser));
-                    document.getElementById('player-name').textContent = currentUser.username;
-                    document.getElementById('player-name-mode').textContent = currentUser.username;
-                    showScreen('mode-screen');
-                    await loadUserStats();
-                } else {
-                    alert('Registration failed: ' + data.error);
-                }
+                console.log('Backend user creation response:', data);
             } catch (error) {
-                alert('Registration failed. Please try again.');
+                console.error('Backend user creation error:', error);
+                // Don't fail authentication if backend user creation fails
             }
         }
 
@@ -816,7 +1068,7 @@
         }
 
         async function loadUserStats() {
-            if (!currentUser?.userId || currentUser.userId.startsWith('offline_')) {
+            if (!currentUser?.userId || currentUser.isGuest) {
                 return;
             }
             
@@ -923,14 +1175,21 @@
         }
         
         function logout() {
+            // Sign out from Cognito if not a guest
+            if (currentUser && !currentUser.isGuest && cognitoUser) {
+                cognitoUser.signOut();
+            }
+            
             // Clear user data
             currentUser = null;
+            cognitoUser = null;
             gameStats = { totalGames: 0, wins: 0, losses: 0, draws: 0 };
             gameMode = 'computer';
             currentGameId = null;
             
             // Clear localStorage
             localStorage.removeItem('rpsUser');
+            localStorage.removeItem('cognitoTokens');
             
             // Clear intervals
             if (gameCheckInterval) {
@@ -945,12 +1204,14 @@
             }
             
             // Clear form fields
-            document.getElementById('login-username').value = '';
             document.getElementById('login-email').value = '';
-            document.getElementById('reg-username').value = '';
+            document.getElementById('login-password').value = '';
             document.getElementById('reg-email').value = '';
+            document.getElementById('reg-password').value = '';
+            document.getElementById('reg-username').value = '';
             
             // Show login screen
+            showAuthOptions();
             showScreen('login-screen');
         }
     </script>

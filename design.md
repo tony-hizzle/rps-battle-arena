@@ -24,12 +24,12 @@
 #### API Layer
 - **REST API**: Amazon API Gateway for all communication
 - **Real-time Communication**: Polling-based updates every 2 seconds
-- **Authentication**: Custom username/email registration system
+- **Authentication**: Amazon Cognito User Pools with email verification
 
 #### Backend Layer
 - **Compute**: AWS Lambda functions (Node.js)
 - **Database**: Amazon DynamoDB (Users, Games tables)
-- **Authentication**: Custom user management in DynamoDB
+- **Authentication**: Amazon Cognito User Pools with DynamoDB user sync
 
 ## Database Design
 
@@ -92,8 +92,8 @@ Attributes:
 ### REST API Endpoints
 
 #### Authentication
-- `POST /auth` - User registration and login
-  - Actions: `register`, `login`
+- `POST /auth` - Cognito user management
+  - Actions: `create_user`
 
 #### Game Management
 - `POST /game` - All game operations
@@ -225,9 +225,10 @@ const gameState = {
 ## Security Considerations
 
 ### Authentication & Authorization
-- Custom user registration and login system
-- localStorage session persistence
-- Server-side user validation
+- AWS Cognito User Pools for secure authentication
+- JWT token validation on server-side
+- Email verification required for account activation
+- Guest mode for non-authenticated users
 
 ### Input Validation
 - Client-side and server-side move validation
@@ -339,7 +340,16 @@ function playAgain() {
 - Input validation is implemented but should be regularly reviewed
 - Rate limiting may be needed for production deployment
 
-## Current Features (v2.0)
+## Current Features (v3.0)
+
+### Cognito Authentication
+- **Email/Password Authentication**: Secure AWS Cognito integration
+- **Email Verification**: Required email verification for new accounts
+- **Guest Mode**: Play without registration (stats not saved)
+- **Token-based Security**: JWT tokens for secure API access
+- **Cross-browser Support**: Works in Chrome, Safari, Firefox
+
+## Previous Features (v2.0)
 
 ### Rematch System
 - **Smart Rematch Logic**: First player creates rematch game, second player joins existing game
@@ -366,6 +376,7 @@ function playAgain() {
 ## Future Enhancements
 
 ### Planned Features
+- Social login providers (Google, Facebook) via Cognito
 - Tournament mode with bracket system
 - Player profiles with avatars
 - Chat system for players
@@ -374,9 +385,8 @@ function playAgain() {
 
 ### Technical Improvements
 - Replace polling-based matchmaking with WebSocket real-time notifications
-- Implement proper authentication with JWT tokens
 - Add comprehensive error handling and retry logic
 - Optimize database queries and indexing
 - Implement caching layer for frequently accessed data
 - Add monitoring and alerting for system health
-- Implement server-side session management for better state handling
+- Implement advanced Cognito features (MFA, password policies)

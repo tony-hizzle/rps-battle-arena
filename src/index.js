@@ -17,54 +17,37 @@ exports.handler = async (event) => {
         
         // Authentication endpoints
         if (httpMethod === 'POST' && path === '/auth') {
-            const { action, username, email } = requestBody;
+            const { action, userId, username, email } = requestBody;
             
-            if (action === 'login') {
-                if (!username || !email) {
-                    return error('Username and email are required');
+            if (action === 'create_user') {
+                if (!userId || !username || !email) {
+                    return error('User ID, username, and email are required');
                 }
                 
-                const user = await getUser(username);
-                if (!user) {
-                    return error('Username not found', 404);
-                }
-                
-                if (user.email !== email) {
-                    return error('Email does not match');
-                }
-                
-                return success({ user: { userId: user.userId, username: user.username } });
-            }
-            
-            if (action === 'register') {
-                if (!username || !email) {
-                    return error('Username and email are required');
-                }
-                
-                const AWS = require('aws-sdk');
-                const dynamodb = new AWS.DynamoDB.DocumentClient();
-                
-                const existingUsers = await dynamodb.scan({
-                    TableName: process.env.USERS_TABLE,
-                    FilterExpression: 'username = :username OR email = :email',
-                    ExpressionAttributeValues: { 
-                        ':username': username,
-                        ':email': email
+                try {
+                    // Check if user exists in our database
+                    let user = await getUser(userId);
+                    
+                    if (!user) {
+                        // Create new user in our database
+                        user = await createUser({ 
+                            userId: userId,
+                            username: username,
+                            email: email
+                        });
                     }
-                }).promise();
-                
-                if (existingUsers.Items.length > 0) {
-                    const existingUser = existingUsers.Items[0];
-                    if (existingUser.username === username) {
-                        return error('Username already exists');
-                    }
-                    if (existingUser.email === email) {
-                        return error('Email already exists');
-                    }
+                    
+                    return success({ 
+                        user: { 
+                            userId: user.userId, 
+                            username: user.username,
+                            email: user.email
+                        } 
+                    });
+                } catch (err) {
+                    console.error('User creation error:', err);
+                    return error('User creation failed');
                 }
-                
-                const user = await createUser({ username, email });
-                return success({ user: { userId: user.userId, username: user.username } });
             }
         }
         
@@ -87,8 +70,8 @@ exports.handler = async (event) => {
             });
         }
         
-        // Leaderboard endpoint
-        if (httpMethod === 'GET' && path === '/leaderboard') {
+        // Leaderboard endpoint  
+        if (httpMethod === 'GET' && path.startsWith('/leaderboard')) {
             try {
                 const AWS = require('aws-sdk');
                 const dynamodb = new AWS.DynamoDB.DocumentClient();
@@ -110,14 +93,7 @@ exports.handler = async (event) => {
                         winRate: user.totalGames > 0 ? Math.round((user.wins || 0) / user.totalGames * 100) : 0
                     }));
                 
-                // Add some sample data if no real users exist
-                if (leaderboard.length === 0) {
-                    return success([
-                        { rank: 1, username: 'RockMaster', wins: 45, totalGames: 60, winRate: 75 },
-                        { rank: 2, username: 'PaperChamp', wins: 38, totalGames: 50, winRate: 76 },
-                        { rank: 3, username: 'ScissorsPro', wins: 32, totalGames: 45, winRate: 71 }
-                    ]);
-                }
+
                 
                 return success(leaderboard);
             } catch (err) {

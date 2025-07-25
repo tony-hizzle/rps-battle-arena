@@ -11,7 +11,9 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 ## Functional Requirements
 
 ### Core Features
-- [x] User registration and authentication
+- [x] AWS Cognito user authentication
+- [x] Email verification workflow
+- [x] Guest mode for casual play
 - [x] Real-time multiplayer game matching
 - [x] Rock, Paper, Scissors game logic
 - [x] Win/loss tracking and statistics
@@ -23,7 +25,8 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 - [x] Enhanced leaderboard with user ranking
 
 ### User Stories
-- As a player, I want to create an account so that my wins are tracked
+- As a player, I want to create a secure account with email verification so that my wins are tracked
+- As a casual player, I want to play as a guest without registration for quick games
 - As a player, I want to be matched with another online player so that I can play Rock, Paper, Scissors
 - As a player, I want to see my win/loss record so that I can track my performance
 - As a player, I want to see a leaderboard so that I can compare my performance with others
@@ -58,7 +61,7 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 - [x] Amazon API Gateway (REST API)
 - [x] AWS Lambda (Serverless backend logic)
 - [x] Amazon DynamoDB (User data and game statistics)
-- [x] Custom Authentication (Username/email system)
+- [x] Amazon Cognito (User authentication and management)
 - [x] Polling-based Real-time Communication (Alternative to WebSocket)
 - [x] Amazon CloudFront (Content delivery via S3)
 
@@ -112,7 +115,17 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 - **Efficient Database**: DynamoDB with optimized queries
 - **Serverless Scaling**: Lambda functions auto-scale with demand
 
-## Recent Enhancements (v2.0)
+## Recent Enhancements (v3.0)
+
+### Cognito Authentication
+- [x] AWS Cognito User Pool integration
+- [x] Email/password authentication
+- [x] Email verification workflow
+- [x] Guest mode for unregistered users
+- [x] Secure token-based authentication
+- [x] Cross-browser compatibility fixes
+
+## Previous Enhancements (v2.0)
 
 ### Rematch System
 - [x] Instant rematch between same players

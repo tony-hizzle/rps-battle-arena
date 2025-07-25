@@ -32,7 +32,10 @@ Perfect for quick gaming sessions, competitive tournaments, or casual fun with f
 
 ## 🔄 Recent Updates
 
-### Latest Features (v2.0)
+### Latest Features (v3.0)
+- ✅ **Cognito Authentication**: AWS Cognito integration with email/password
+- ✅ **Email Verification**: Secure account verification workflow
+- ✅ **Guest Mode**: Play without registration for casual users
 - ✅ **Rematch System**: Instant rematches between same players
 - ✅ **Game Timeouts**: 1-minute timeout with automatic cleanup
 - ✅ **Enhanced Leaderboard**: Shows user rank even outside top 10
@@ -77,13 +80,15 @@ Perfect for quick gaming sessions, competitive tournaments, or casual fun with f
 - **Automatic timeout handling** with page refresh
 
 ### 🔧 User Experience
-- **User Authentication**: Login/Register system
+- **Cognito Authentication**: AWS Cognito email/password authentication
+- **Email Verification**: Secure account verification process
+- **Guest Mode**: Play without registration (stats not saved)
 - **Persistent Sessions**: Stay logged in across visits
 - **Responsive Design**: Works on desktop and mobile
 - **Cross-browser Support**: Chrome, Safari, Firefox compatible
 
 ### API Endpoints
-- `POST /auth` - User login/registration
+- `POST /auth` - Cognito user creation and management
 - `GET /leaderboard?userId={id}` - Leaderboard with user rank
 - `GET /stats/{userId}` - User statistics
 - `POST /game` - Game actions (play, find_match, request_rematch)
@@ -160,12 +165,13 @@ open frontend/index.html
 ### Backend
 - **Compute**: AWS Lambda (Node.js 18.x)
 - **API**: Amazon API Gateway REST API
-- **Authentication**: Custom user system
+- **Authentication**: Amazon Cognito User Pools
 - **Game Logic**: Server-side move validation
 
 ### Database
 - **Primary**: Amazon DynamoDB
-- **Tables**: Users, Games, Connections
+- **Authentication**: Amazon Cognito User Pools
+- **Tables**: Users, Games
 - **Features**: Pay-per-request billing, automatic scaling
 
 ### Infrastructure
