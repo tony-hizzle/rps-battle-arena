@@ -382,6 +382,7 @@ function playAgain() {
 - Chat system for players
 - Mobile app development
 - Advanced statistics and analytics
+- Guest player progression system (temporary stats)
 
 ### Technical Improvements
 - Replace polling-based matchmaking with WebSocket real-time notifications
@@ -390,3 +391,4 @@ function playAgain() {
 - Implement caching layer for frequently accessed data
 - Add monitoring and alerting for system health
 - Implement advanced Cognito features (MFA, password policies)
+- Enhanced guest experience with session-based temporary stats

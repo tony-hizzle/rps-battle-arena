@@ -54,6 +54,17 @@ exports.handler = async (event) => {
         // Stats endpoint
         if (httpMethod === 'GET' && path.startsWith('/stats/')) {
             const userId = path.split('/')[2];
+            
+            // Don't track stats for guest users
+            if (userId && userId.startsWith('guest_')) {
+                return success({
+                    totalGames: 0,
+                    wins: 0,
+                    losses: 0,
+                    draws: 0
+                });
+            }
+            
             const user = await getUser(userId);
             
             if (!user) {
@@ -78,11 +89,11 @@ exports.handler = async (event) => {
                 
                 const result = await dynamodb.scan({
                     TableName: process.env.USERS_TABLE,
-                    ProjectionExpression: 'username, wins, totalGames'
+                    ProjectionExpression: 'userId, username, wins, totalGames'
                 }).promise();
                 
                 const leaderboard = result.Items
-                    .filter(user => user.totalGames > 0)
+                    .filter(user => user.totalGames > 0 && !user.userId.startsWith('guest_'))
                     .sort((a, b) => (b.wins || 0) - (a.wins || 0))
                     .slice(0, 10)
                     .map((user, index) => ({
@@ -92,8 +103,6 @@ exports.handler = async (event) => {
                         totalGames: user.totalGames || 0,
                         winRate: user.totalGames > 0 ? Math.round((user.wins || 0) / user.totalGames * 100) : 0
                     }));
-                
-
                 
                 return success(leaderboard);
             } catch (err) {
@@ -601,8 +610,8 @@ exports.handler = async (event) => {
                     
                     const gameId = 'game_' + Date.now();
                 
-                // Save game record
-                if (userId) {
+                // Save game record (skip for guest users)
+                if (userId && !userId.startsWith('guest_')) {
                     try {
                         const AWS = require('aws-sdk');
                         const dynamodb = new AWS.DynamoDB.DocumentClient();

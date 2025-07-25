@@ -13,20 +13,22 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 ### Core Features
 - [x] AWS Cognito user authentication
 - [x] Email verification workflow
-- [x] Guest mode for casual play
-- [x] Real-time multiplayer game matching
+- [x] Guest mode for computer-only play
+- [x] Guest restrictions (no multiplayer/stats/leaderboard)
+- [x] Real-time multiplayer game matching (authenticated users)
 - [x] Rock, Paper, Scissors game logic
-- [x] Win/loss tracking and statistics
-- [x] Game history and leaderboard
+- [x] Win/loss tracking and statistics (authenticated users)
+- [x] Game history and leaderboard (authenticated users)
 - [x] Real-time game state synchronization
 - [x] Rematch system for continuous play
 - [x] Game timeouts (1-minute limit)
-- [x] Computer opponent mode
+- [x] Computer opponent mode (all users)
 - [x] Enhanced leaderboard with user ranking
 
 ### User Stories
 - As a player, I want to create a secure account with email verification so that my wins are tracked
-- As a casual player, I want to play as a guest without registration for quick games
+- As a casual player, I want to play as a guest against computer for quick games
+- As a guest, I want to be encouraged to sign up for multiplayer and competitive features
 - As a player, I want to be matched with another online player so that I can play Rock, Paper, Scissors
 - As a player, I want to see my win/loss record so that I can track my performance
 - As a player, I want to see a leaderboard so that I can compare my performance with others
@@ -115,7 +117,17 @@ Create an engaging multiplayer web application where users can play Rock, Paper,
 - **Efficient Database**: DynamoDB with optimized queries
 - **Serverless Scaling**: Lambda functions auto-scale with demand
 
-## Recent Enhancements (v3.0)
+## Recent Enhancements (v3.1)
+
+### Guest Player Experience
+- [x] Computer-only gameplay for guests
+- [x] Multiplayer restricted to authenticated users
+- [x] Guests excluded from leaderboard and stats tracking
+- [x] Encouraging messaging to promote sign-up
+- [x] Streamlined guest UI with appropriate restrictions
+- [x] Default system button styling for guest actions
+
+## Previous Enhancements (v3.0)
 
 ### Cognito Authentication
 - [x] AWS Cognito User Pool integration

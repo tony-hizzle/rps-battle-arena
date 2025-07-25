@@ -32,10 +32,11 @@ Perfect for quick gaming sessions, competitive tournaments, or casual fun with f
 
 ## 🔄 Recent Updates
 
-### Latest Features (v3.0)
+### Latest Features (v3.1)
 - ✅ **Cognito Authentication**: AWS Cognito integration with email/password
 - ✅ **Email Verification**: Secure account verification workflow
-- ✅ **Guest Mode**: Play without registration for casual users
+- ✅ **Guest Mode**: Computer-only play without registration
+- ✅ **Guest Restrictions**: Guests excluded from leaderboard and stats tracking
 - ✅ **Rematch System**: Instant rematches between same players
 - ✅ **Game Timeouts**: 1-minute timeout with automatic cleanup
 - ✅ **Enhanced Leaderboard**: Shows user rank even outside top 10
@@ -82,7 +83,8 @@ Perfect for quick gaming sessions, competitive tournaments, or casual fun with f
 ### 🔧 User Experience
 - **Cognito Authentication**: AWS Cognito email/password authentication
 - **Email Verification**: Secure account verification process
-- **Guest Mode**: Play without registration (stats not saved)
+- **Guest Mode**: Computer-only play without registration (no stats/leaderboard)
+- **Guest Restrictions**: Multiplayer and competitive features require sign-up
 - **Persistent Sessions**: Stay logged in across visits
 - **Responsive Design**: Works on desktop and mobile
 - **Cross-browser Support**: Chrome, Safari, Firefox compatible
@@ -190,7 +192,8 @@ open frontend/index.html
 ### Computer Games
 - **AI Opponent**: Random move generation
 - **Instant Results**: No waiting for opponent
-- **Stats Tracking**: Wins/losses recorded
+- **Stats Tracking**: Wins/losses recorded (authenticated users only)
+- **Guest Access**: Available to all users including guests
 
 ### Scoring
 - **Win**: Your move beats opponent's move

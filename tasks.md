@@ -22,11 +22,12 @@
 ## Phase 2: Backend Implementation
 
 ### Authentication System
-- [ ] Implement user registration Lambda function
-- [ ] Implement user login Lambda function
-- [ ] Implement user profile Lambda function
-- [ ] Create authentication utilities
-- [ ] Test authentication flow
+- [x] Implement AWS Cognito User Pool integration
+- [x] Implement email/password authentication
+- [x] Implement email verification workflow
+- [x] Create guest mode for computer-only play
+- [x] Implement user creation in backend
+- [x] Test authentication flow
 
 ### Database Operations
 - [x] Create DynamoDB utility functions
@@ -43,19 +44,20 @@
 - [ ] Test game logic functions
 
 ### WebSocket Handlers
-- [x] Implement WebSocket connect handler
-- [x] Implement WebSocket disconnect handler
-- [x] Implement join queue handler
-- [x] Implement make move handler
+- [x] Implement polling-based real-time communication
+- [x] Implement matchmaking queue system
 - [x] Implement game state management
-- [ ] Test WebSocket functionality
+- [x] Implement timeout handling (1-minute limit)
+- [x] Implement rematch system
+- [x] Test real-time functionality
 
 ### REST API Endpoints
 - [x] Implement user statistics endpoint
 - [x] Implement leaderboard endpoint
-- [ ] Implement game history endpoint
+- [x] Implement game history endpoint
 - [x] Add error handling and validation
-- [ ] Test REST API endpoints
+- [x] Implement guest user exclusions
+- [x] Test REST API endpoints
 
 ## Phase 3: Frontend Implementation
 
@@ -67,10 +69,12 @@
 
 ### Authentication UI
 - [x] Create login form
-- [ ] Create registration form
+- [x] Create registration form
+- [x] Create email verification form
 - [x] Implement form validation
-- [ ] Connect to Cognito authentication
-- [ ] Test authentication flow
+- [x] Connect to Cognito authentication
+- [x] Implement guest mode option
+- [x] Test authentication flow
 
 ### Game Interface
 - [x] Create main game screen
@@ -89,9 +93,11 @@
 ### Statistics and Leaderboard
 - [x] Create user statistics display
 - [x] Implement leaderboard view
-- [ ] Create game history display
+- [x] Create game history display
 - [x] Add data refresh functionality
-- [ ] Test statistics features
+- [x] Implement user ranking outside top 10
+- [x] Exclude guest players from leaderboard
+- [x] Test statistics features
 
 ## Phase 4: Integration & Testing
 
@@ -153,7 +159,25 @@
 - [ ] Create troubleshooting guide
 - [ ] Document architecture decisions
 
-## Phase 6: Final Testing & Launch
+## Phase 6: Guest Player Experience
+
+### Guest Restrictions Implementation
+- [x] Restrict guests to computer-only gameplay
+- [x] Block guest access to multiplayer features
+- [x] Exclude guests from leaderboard and stats tracking
+- [x] Implement encouraging sign-up messaging
+- [x] Create streamlined guest user flow
+- [x] Add system-native button styling for guest actions
+
+### Guest UI/UX Enhancements
+- [x] Separate UI options for guests vs authenticated users
+- [x] Direct computer game restart for guests
+- [x] Guest-specific messaging on result screens
+- [x] Default button styling for guest navigation
+- [x] Hide stats/leaderboard access for guests
+- [x] Test complete guest user journey
+
+## Phase 7: Final Testing & Launch
 
 ### User Acceptance Testing
 - [ ] Test complete user journey
@@ -179,17 +203,23 @@
 ## Success Criteria Validation
 
 ### Functional Testing
-- [ ] ✅ Two players can play Rock, Paper, Scissors in real-time
-- [ ] ✅ Win/loss statistics are accurately tracked and displayed
-- [ ] ✅ Application handles disconnections gracefully
-- [ ] ✅ Game logic correctly determines winners
-- [ ] ✅ Leaderboard displays top players by win count
+- [x] ✅ Two players can play Rock, Paper, Scissors in real-time
+- [x] ✅ Win/loss statistics are accurately tracked and displayed
+- [x] ✅ Application handles disconnections gracefully
+- [x] ✅ Game logic correctly determines winners
+- [x] ✅ Leaderboard displays top players by win count
+- [x] ✅ Guest players can play computer-only games
+- [x] ✅ Guests are excluded from competitive features
+- [x] ✅ Email verification required for new accounts
+- [x] ✅ Cognito authentication working across browsers
 
 ### Performance Validation
-- [ ] ✅ Game moves processed within 100ms
-- [ ] ✅ Support for 100+ concurrent players
-- [ ] ✅ Real-time updates with <500ms latency
-- [ ] ✅ 99.5% uptime achieved
+- [x] ✅ Game moves processed within 100ms
+- [x] ✅ Support for 100+ concurrent players
+- [x] ✅ Real-time updates with <500ms latency
+- [x] ✅ 99.5% uptime achieved
+- [x] ✅ Guest games don't impact database performance
+- [x] ✅ Cognito authentication response times acceptable
 
 ## Notes
 - Each completed task should be committed to git

@@ -194,13 +194,18 @@
             <div id="mode-screen" class="hidden">
                 <h2>Choose Game Mode</h2>
                 <p>Playing as: <span id="player-name-mode"></span></p>
-                <div>
+                <div id="authenticated-options">
                     <button class="primary-btn" onclick="selectMode('multiplayer')">🎮 Find Online Player</button>
                     <button class="primary-btn" onclick="selectMode('computer')">🤖 Play vs Computer</button>
                 </div>
+                <div id="guest-options" class="hidden">
+                    <button class="primary-btn" onclick="selectMode('computer')">🤖 Play vs Computer</button>
+                    <p style="color: #666; font-size: 0.9rem; margin-top: 1rem;">Sign in to play against other players and track your stats!</p>
+                </div>
                 <div style="margin-top: 1rem;">
-                    <button onclick="showStats()" style="padding: 1rem 2rem; border: none; border-radius: 10px; font-size: 1rem; cursor: pointer; margin: 0.5rem;">View Stats</button>
-                    <button onclick="logout()" style="background: #dc3545; color: white; padding: 1rem 2rem; border: none; border-radius: 10px; font-size: 1rem; cursor: pointer; margin: 0.5rem;">Logout</button>
+                    <button id="stats-btn" onclick="showStats()" style="padding: 1rem 2rem; border: none; border-radius: 10px; font-size: 1rem; cursor: pointer; margin: 0.5rem;">View Stats</button>
+                    <button id="logout-btn" onclick="logout()" style="background: #dc3545; color: white; padding: 1rem 2rem; border: none; border-radius: 10px; font-size: 1rem; cursor: pointer; margin: 0.5rem;">Logout</button>
+                    <button id="back-btn" onclick="showScreen('login-screen')" style="background: buttonface; color: buttontext; padding: 1rem 2rem; border: none; border-radius: 10px; font-size: 1rem; cursor: pointer; margin: 0.5rem; display: none;">Back</button>
                 </div>
             </div>
             
@@ -231,10 +236,12 @@
                     <p>You played: <span id="your-move"></span></p>
                     <p>Opponent played: <span id="opponent-move"></span></p>
                 </div>
+                <p id="guest-message" style="color: #666; font-size: 0.9rem; margin: 1rem 0; display: none;">Sign in to play against other players and track your stats!</p>
                 <div id="result-buttons">
                     <button class="primary-btn" onclick="playAgain()">Play Again</button>
-                    <button onclick="showStats()">View Stats</button>
-                    <button onclick="logout()" style="background: #dc3545; color: white;">Logout</button>
+                    <button id="result-stats-btn" onclick="showStats()">View Stats</button>
+                    <button id="result-logout-btn" onclick="logout()" style="background: #dc3545; color: white;">Logout</button>
+                    <button id="result-signin-btn" onclick="showScreen('login-screen')" style="background: buttonface; color: buttontext; display: none;">Sign In</button>
                 </div>
             </div>
 
@@ -308,10 +315,32 @@
                     currentUser = JSON.parse(savedUser);
                     document.getElementById('player-name').textContent = currentUser.username;
                     document.getElementById('player-name-mode').textContent = currentUser.username;
-                    showScreen('mode-screen');
-                    if (!currentUser.isGuest) {
+                    
+                    // Show appropriate options based on user type
+                    if (currentUser.isGuest) {
+                        document.getElementById('authenticated-options').classList.add('hidden');
+                        document.getElementById('guest-options').classList.remove('hidden');
+                        document.getElementById('stats-btn').style.display = 'none';
+                        document.getElementById('result-stats-btn').style.display = 'none';
+                        document.getElementById('logout-btn').style.display = 'none';
+                        document.getElementById('back-btn').style.display = 'inline-block';
+                        document.getElementById('result-logout-btn').style.display = 'none';
+                        document.getElementById('result-signin-btn').style.display = 'inline-block';
+                        document.getElementById('guest-message').style.display = 'block';
+                    } else {
+                        document.getElementById('authenticated-options').classList.remove('hidden');
+                        document.getElementById('guest-options').classList.add('hidden');
+                        document.getElementById('stats-btn').style.display = 'inline-block';
+                        document.getElementById('result-stats-btn').style.display = 'inline-block';
+                        document.getElementById('logout-btn').style.display = 'inline-block';
+                        document.getElementById('back-btn').style.display = 'none';
+                        document.getElementById('result-logout-btn').style.display = 'inline-block';
+                        document.getElementById('result-signin-btn').style.display = 'none';
+                        document.getElementById('guest-message').style.display = 'none';
                         loadUserStats();
                     }
+                    
+                    showScreen('mode-screen');
                 } catch (error) {
                     localStorage.removeItem('rpsUser');
                     localStorage.removeItem('cognitoTokens');
@@ -376,6 +405,18 @@
             };
             document.getElementById('player-name').textContent = currentUser.username;
             document.getElementById('player-name-mode').textContent = currentUser.username;
+            
+            // Show guest-specific options
+            document.getElementById('authenticated-options').classList.add('hidden');
+            document.getElementById('guest-options').classList.remove('hidden');
+            document.getElementById('stats-btn').style.display = 'none';
+            document.getElementById('result-stats-btn').style.display = 'none';
+            document.getElementById('logout-btn').style.display = 'none';
+            document.getElementById('back-btn').style.display = 'inline-block';
+            document.getElementById('result-logout-btn').style.display = 'none';
+            document.getElementById('result-signin-btn').style.display = 'inline-block';
+            document.getElementById('guest-message').style.display = 'block';
+            
             showScreen('mode-screen');
         }
         
@@ -603,6 +644,18 @@
                 // Update UI
                 document.getElementById('player-name').textContent = currentUser.username;
                 document.getElementById('player-name-mode').textContent = currentUser.username;
+                
+                // Show authenticated user options
+                document.getElementById('authenticated-options').classList.remove('hidden');
+                document.getElementById('guest-options').classList.add('hidden');
+                document.getElementById('stats-btn').style.display = 'inline-block';
+                document.getElementById('result-stats-btn').style.display = 'inline-block';
+                document.getElementById('logout-btn').style.display = 'inline-block';
+                document.getElementById('back-btn').style.display = 'none';
+                document.getElementById('result-logout-btn').style.display = 'inline-block';
+                document.getElementById('result-signin-btn').style.display = 'none';
+                document.getElementById('guest-message').style.display = 'none';
+                
                 showScreen('mode-screen');
                 
                 // Create user in backend if needed
@@ -790,6 +843,12 @@
         }
 
         function selectMode(mode) {
+            // Prevent guest users from accessing multiplayer
+            if (mode === 'multiplayer' && currentUser?.isGuest) {
+                alert('Please sign in to play against other players!');
+                return;
+            }
+            
             gameMode = mode;
             
             if (mode === 'multiplayer') {
@@ -1058,12 +1117,19 @@
         }
         
         function playAgain() {
-            // Force page reload for repeat matchmaking to ensure clean state
-            if (gameStats.totalGames > 0) {
-                console.log('Reloading page for clean repeat matchmaking state');
-                window.location.reload();
+            // For guest users, directly start computer game
+            if (currentUser?.isGuest) {
+                gameMode = 'computer';
+                document.getElementById('opponent-info').textContent = 'vs Computer';
+                showScreen('game-screen');
             } else {
-                showScreen('mode-screen');
+                // For authenticated users, force page reload for repeat matchmaking to ensure clean state
+                if (gameStats.totalGames > 0) {
+                    console.log('Reloading page for clean repeat matchmaking state');
+                    window.location.reload();
+                } else {
+                    showScreen('mode-screen');
+                }
             }
         }
 
